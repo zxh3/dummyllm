@@ -18,7 +18,7 @@ from ..images import image_size, parse_size, render_cat, render_cat_b64
 from ..tokens import count_tokens
 
 # Models that only ever return base64 (like gpt-image-1).
-_B64_ONLY_RE = re.compile(r"^(gpt-image|meow-image)")
+_B64_ONLY_RE = re.compile(r"^(gpt-image|kiana-image)")
 _IMAGE_ID_RE = re.compile(r"^img_([0-9a-f]{32})_(\d{2,4})x(\d{2,4})\.png$")
 MAX_IMAGE_BYTES = 50 * 1024 * 1024
 

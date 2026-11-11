@@ -12,12 +12,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 DEFAULT_MODELS: tuple[str, ...] = (
-    "meow-1",
-    "meow-1-mini",
-    "meow-1-vision",
-    "meow-reasoner",
-    "meow-embed",
-    "meow-image-1",
+    "kiana",  # fast chat
+    "kiana-reasoning",  # thinks first (reasoning_content) by default
+    "kiana-vision",  # chat that reacts to images
+    "kiana-embed",  # embeddings
+    "kiana-image",  # image generation (base64 output)
 )
 
 

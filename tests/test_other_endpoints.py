@@ -18,7 +18,7 @@ from dummyllm.testing import DummyLLMServer
 
 
 def test_completion(client):
-    r = client.completions.create(model="meow-1", prompt="Once upon a time")
+    r = client.completions.create(model="kiana", prompt="Once upon a time")
     assert r.object == "text_completion"
     assert r.choices[0].text
     assert r.usage.completion_tokens <= 16  # legacy default max_tokens
@@ -148,7 +148,7 @@ def test_unknown_image_url_404(http):
 
 def test_models(client):
     ids = [m.id for m in client.models.list()]
-    assert "meow-1" in ids
+    assert "kiana" in ids
     m = client.models.retrieve("gpt-anything")
     assert m.id == "gpt-anything" and m.owned_by == "dummyllm"
 

@@ -24,7 +24,7 @@ FN_TOOL = {
 
 
 def test_basic(client):
-    r = client.responses.create(model="meow-1", input="Hello")
+    r = client.responses.create(model="kiana", input="Hello")
     assert r.object == "response"
     assert r.id.startswith("resp_")
     assert r.status == "completed"
@@ -207,7 +207,7 @@ def test_image_input(client):
 
 
 def test_reasoning_summary(client):
-    r = client.responses.create(model="meow-reasoner", input="think", reasoning={"effort": "medium", "summary": "auto"})
+    r = client.responses.create(model="kiana-reasoning", input="think", reasoning={"effort": "medium", "summary": "auto"})
     rs = r.output[0]
     assert rs.type == "reasoning"
     assert rs.summary and rs.summary[0].text
@@ -256,10 +256,10 @@ def test_missing_input(client):
 
 
 def test_reasoning_model_defaults_and_counts(client):
-    r = client.responses.create(model="meow-reasoner", input="think about it")
+    r = client.responses.create(model="kiana-reasoning", input="think about it")
     assert r.usage.output_tokens_details.reasoning_tokens > 0
     assert r.output[0].type == "reasoning"
     assert r.reasoning.effort == "medium"
-    plain = client.responses.create(model="meow-1", input="hi")
+    plain = client.responses.create(model="kiana", input="hi")
     assert plain.usage.output_tokens_details.reasoning_tokens == 0
     assert all(o.type != "reasoning" for o in plain.output)

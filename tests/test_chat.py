@@ -15,10 +15,10 @@ USER = [{"role": "user", "content": "Hello there"}]
 
 
 def test_basic_completion(client):
-    r = client.chat.completions.create(model="meow-1", messages=USER)
+    r = client.chat.completions.create(model="kiana", messages=USER)
     assert r.object == "chat.completion"
     assert r.id.startswith("chatcmpl-")
-    assert r.model == "meow-1"
+    assert r.model == "kiana"
     choice = r.choices[0]
     assert choice.message.role == "assistant"
     assert choice.finish_reason == "stop"
@@ -36,34 +36,34 @@ def test_any_model_name_is_accepted(client):
 
 
 def test_n_choices(client):
-    r = client.chat.completions.create(model="meow-1", messages=USER, n=3)
+    r = client.chat.completions.create(model="kiana", messages=USER, n=3)
     assert [c.index for c in r.choices] == [0, 1, 2]
 
 
 @pytest.mark.parametrize("param", ["max_tokens", "max_completion_tokens"])
 def test_max_tokens_truncates(client, param):
     for _ in range(5):
-        r = client.chat.completions.create(model="meow-1", messages=USER, **{param: 3})
+        r = client.chat.completions.create(model="kiana", messages=USER, **{param: 3})
         assert r.usage.completion_tokens <= 3
         if r.usage.completion_tokens == 3:
             assert r.choices[0].finish_reason in ("length", "stop")
 
 
 def test_max_tokens_one_is_length(client):
-    r = client.chat.completions.create(model="meow-1", messages=USER, max_tokens=1)
+    r = client.chat.completions.create(model="kiana", messages=USER, max_tokens=1)
     assert r.choices[0].finish_reason == "length"
     assert r.usage.completion_tokens == 1
 
 
 def test_stop_sequence(client):
     for _ in range(10):
-        r = client.chat.completions.create(model="meow-1", messages=USER, stop=[" ", "."])
+        r = client.chat.completions.create(model="kiana", messages=USER, stop=[" ", "."])
         assert " " not in r.choices[0].message.content
         assert "." not in r.choices[0].message.content
 
 
 def test_logprobs(client):
-    r = client.chat.completions.create(model="meow-1", messages=USER, logprobs=True, top_logprobs=3)
+    r = client.chat.completions.create(model="kiana", messages=USER, logprobs=True, top_logprobs=3)
     lp = r.choices[0].logprobs.content
     assert "".join(t.token for t in lp) == r.choices[0].message.content
     for t in lp:
@@ -74,15 +74,15 @@ def test_logprobs(client):
 
 
 def test_seed_is_deterministic(client):
-    a = client.chat.completions.create(model="meow-1", messages=USER, seed=7)
-    b = client.chat.completions.create(model="meow-1", messages=USER, seed=7)
-    c = client.chat.completions.create(model="meow-1", messages=USER, seed=8)
+    a = client.chat.completions.create(model="kiana", messages=USER, seed=7)
+    b = client.chat.completions.create(model="kiana", messages=USER, seed=7)
+    c = client.chat.completions.create(model="kiana", messages=USER, seed=8)
     assert a.choices[0].message.content == b.choices[0].message.content
     assert a.choices[0].message.content != c.choices[0].message.content
 
 
 def test_streaming_matches_non_streaming_with_seed(client):
-    kwargs = dict(model="meow-1", messages=USER, seed=99, n=2, logprobs=True)
+    kwargs = dict(model="kiana", messages=USER, seed=99, n=2, logprobs=True)
     full = client.chat.completions.create(**kwargs)
     stream = client.chat.completions.create(**kwargs, stream=True, stream_options={"include_usage": True})
     texts = {0: "", 1: ""}
@@ -110,7 +110,7 @@ def test_streaming_matches_non_streaming_with_seed(client):
 
 
 def test_streaming_without_usage(client):
-    chunks = list(client.chat.completions.create(model="meow-1", messages=USER, stream=True))
+    chunks = list(client.chat.completions.create(model="kiana", messages=USER, stream=True))
     assert chunks[-1].choices[0].finish_reason == "stop"
     assert all(c.usage is None for c in chunks)
 
@@ -127,7 +127,7 @@ def test_stream_raw_sse_format(http):
 
 
 def test_stream_helper(client):
-    with client.chat.completions.stream(model="meow-1", messages=USER) as stream:
+    with client.chat.completions.stream(model="kiana", messages=USER) as stream:
         for _ in stream:
             pass
         final = stream.get_final_completion()
@@ -137,7 +137,7 @@ def test_stream_helper(client):
 def test_async_client_streaming(server):
     async def go():
         client = openai.AsyncOpenAI(base_url=server.base_url, api_key="x", max_retries=0)
-        stream = await client.chat.completions.create(model="meow-1", messages=USER, stream=True)
+        stream = await client.chat.completions.create(model="kiana", messages=USER, stream=True)
         text = ""
         async for chunk in stream:
             if chunk.choices:
@@ -160,7 +160,7 @@ def _validate_args(tool, call):
 
 def test_tool_choice_required(client):
     for _ in range(10):
-        r = client.chat.completions.create(model="meow-1", messages=USER, tools=[WEATHER_TOOL], tool_choice="required")
+        r = client.chat.completions.create(model="kiana", messages=USER, tools=[WEATHER_TOOL], tool_choice="required")
         choice = r.choices[0]
         assert choice.finish_reason == "tool_calls"
         assert choice.message.content is None
@@ -174,7 +174,7 @@ def test_tool_choice_required(client):
 
 def test_tool_choice_named(client):
     r = client.chat.completions.create(
-        model="meow-1",
+        model="kiana",
         messages=USER,
         tools=[WEATHER_TOOL, TIME_TOOL],
         tool_choice={"type": "function", "function": {"name": "get_time"}},
@@ -185,7 +185,7 @@ def test_tool_choice_named(client):
 
 def test_tool_choice_none(client):
     for _ in range(5):
-        r = client.chat.completions.create(model="meow-1", messages=USER, tools=[WEATHER_TOOL], tool_choice="none")
+        r = client.chat.completions.create(model="kiana", messages=USER, tools=[WEATHER_TOOL], tool_choice="none")
         assert r.choices[0].message.tool_calls is None
         assert r.choices[0].finish_reason == "stop"
 
@@ -401,7 +401,7 @@ def test_json_object_response_format(client):
 
 def test_image_input(client):
     r = client.chat.completions.create(
-        model="meow-1-vision",
+        model="kiana-vision",
         messages=[
             {
                 "role": "user",
@@ -445,13 +445,13 @@ def test_invalid_image_data_rejected(client):
 
 
 def test_reasoning_effort(client):
-    r = client.chat.completions.create(model="meow-reasoner", messages=USER, reasoning_effort="high")
+    r = client.chat.completions.create(model="kiana-reasoning", messages=USER, reasoning_effort="high")
     assert r.usage.completion_tokens_details.reasoning_tokens > 0
     assert r.usage.completion_tokens > r.usage.completion_tokens_details.reasoning_tokens
 
 
 def test_reasoning_can_exhaust_budget(client):
-    r = client.chat.completions.create(model="meow-reasoner", messages=USER, reasoning_effort="high", max_completion_tokens=5)
+    r = client.chat.completions.create(model="kiana-reasoning", messages=USER, reasoning_effort="high", max_completion_tokens=5)
     assert r.choices[0].finish_reason == "length"
     assert r.choices[0].message.content == ""
     assert r.usage.completion_tokens == 5
@@ -524,7 +524,7 @@ from dummyllm.tokens import count_tokens  # noqa: E402
 
 
 def test_reasoning_content_non_streaming(client):
-    r = client.chat.completions.create(model="meow-1", messages=USER, reasoning_effort="medium")
+    r = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="medium")
     msg = r.choices[0].message
     thinking = msg.reasoning_content  # extra field, exposed by the SDK's permissive models
     assert isinstance(thinking, str) and thinking
@@ -541,15 +541,15 @@ def test_reasoning_effort_scales_length(client):
 
 
 def test_no_reasoning_without_effort(client):
-    r = client.chat.completions.create(model="meow-1", messages=USER)
+    r = client.chat.completions.create(model="kiana", messages=USER)
     assert getattr(r.choices[0].message, "reasoning_content", None) is None
     assert r.usage.completion_tokens_details.reasoning_tokens == 0
-    r = client.chat.completions.create(model="meow-reasoner", messages=USER, reasoning_effort="none")
+    r = client.chat.completions.create(model="kiana-reasoning", messages=USER, reasoning_effort="none")
     assert getattr(r.choices[0].message, "reasoning_content", None) is None
 
 
 def test_reasoning_model_thinks_by_default(client):
-    r = client.chat.completions.create(model="meow-reasoner", messages=USER)
+    r = client.chat.completions.create(model="kiana-reasoning", messages=USER)
     assert r.choices[0].message.reasoning_content
     assert r.usage.completion_tokens_details.reasoning_tokens > 0
 

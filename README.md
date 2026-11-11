@@ -11,7 +11,7 @@ when you want it, and strict about request validation the same way the real API 
 bugs surface locally instead of in production.
 
 ```text
-$ curl -s localhost:8000/v1/chat/completions -d '{"model":"meow-1","messages":[{"role":"user","content":"hi"}]}' | jq -r '.choices[0].message.content'
+$ curl -s localhost:8000/v1/chat/completions -d '{"model":"kiana","messages":[{"role":"user","content":"hi"}]}' | jq -r '.choices[0].message.content'
 Mrrp rrrow. Prrr meow meow meow! *blinks slowly* Nya?
 ```
 
@@ -26,7 +26,7 @@ uv run dummyllm                      # http://127.0.0.1:8000/v1
 from openai import OpenAI
 
 client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="anything")
-print(client.chat.completions.create(model="meow-1", messages=[{"role": "user", "content": "hi"}]).choices[0].message.content)
+print(client.chat.completions.create(model="kiana", messages=[{"role": "user", "content": "hi"}]).choices[0].message.content)
 ```
 
 Or with Docker:
@@ -178,7 +178,7 @@ Every option is a CLI flag and a `DUMMYLLM_*` environment variable:
 | `--port` | `DUMMYLLM_PORT` | `8000` |
 | `--api-key` | `DUMMYLLM_API_KEY` | none (no auth) |
 | `--seed` | `DUMMYLLM_SEED` | none |
-| `--models` | `DUMMYLLM_MODELS` | `meow-1,meow-1-mini,meow-1-vision,meow-reasoner,meow-embed,meow-image-1` |
+| `--models` | `DUMMYLLM_MODELS` | `kiana,kiana-reasoning,kiana-vision,kiana-embed,kiana-image` |
 | `--min-reply-tokens` / `--max-reply-tokens` | `DUMMYLLM_MIN_REPLY_TOKENS` / `DUMMYLLM_MAX_REPLY_TOKENS` | `4` / `48` |
 | `--tool-call-probability` | `DUMMYLLM_TOOL_CALL_PROBABILITY` | `0.5` |
 | `--tool-call-probability-after-tool-result` | `DUMMYLLM_TOOL_CALL_PROBABILITY_AFTER_TOOL_RESULT` | `0.2` |

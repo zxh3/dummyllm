@@ -7,6 +7,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { viewTransition } from "@/lib/browser"
 import { useChat } from "@/lib/store"
 
+/** What each advertised model does differently. */
+const MODEL_INFO: Record<string, string> = {
+  kiana: "Fast replies",
+  "kiana-reasoning": "Thinks before it answers",
+  "kiana-vision": "Reacts to images you attach",
+}
+
 export function ChatHeader({ models, onOpenSettings, onOpenCode }: { models: string[]; onOpenSettings: () => void; onOpenCode: () => void }) {
   const model = useChat((s) => s.settings.model)
   const setSettings = useChat((s) => s.setSettings)
@@ -30,11 +37,14 @@ export function ChatHeader({ models, onOpenSettings, onOpenCode }: { models: str
             <ChevronDownIcon className="size-3.5 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" className="min-w-44">
+        <DropdownMenuContent align="start" className="min-w-56">
           {options.map((id) => (
-            <DropdownMenuItem key={id} onSelect={() => setSettings({ model: id })}>
-              {id}
-              {id === model && <CheckIcon className="ml-auto" />}
+            <DropdownMenuItem key={id} onSelect={() => setSettings({ model: id })} className="items-start gap-3 py-1.5">
+              <div className="flex-1">
+                <div>{id}</div>
+                {MODEL_INFO[id] && <div className="text-xs text-muted-foreground">{MODEL_INFO[id]}</div>}
+              </div>
+              {id === model && <CheckIcon className="mt-0.5" />}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>

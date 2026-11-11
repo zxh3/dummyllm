@@ -2,7 +2,7 @@ import { TOOLS } from "./tools"
 import type { AssistantMessage, Chat, Round, SendOptions, Settings, UserMessage } from "./types"
 
 export const API_BASE = `${window.location.origin}/v1`
-export const IMAGE_MODEL = "meow-image-1"
+export const IMAGE_MODEL = "kiana-image"
 
 export class ApiError extends Error {
   status?: number

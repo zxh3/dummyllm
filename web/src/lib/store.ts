@@ -7,7 +7,7 @@ import { runTool } from "./tools"
 import type { AssistantMessage, Chat, Round, SendOptions, Settings, UserMessage } from "./types"
 
 export const DEFAULT_SETTINGS: Settings = {
-  model: "meow-1",
+  model: "kiana",
   system: "",
   temperature: 1,
   maxTokens: "",
@@ -52,6 +52,14 @@ function loadPrefs(): { settings: Settings; currentId: string | null } {
     if (saved.ttft === 450) delete saved.ttft
     if (saved.tps === 40) delete saved.tps
     if (saved.reasoning === "none") delete saved.reasoning // old default meant "don't send"
+    // Models were renamed from meow-* to kiana-*.
+    const renamed: Record<string, string> = {
+      "meow-1": "kiana",
+      "meow-1-mini": "kiana",
+      "meow-1-vision": "kiana-vision",
+      "meow-reasoner": "kiana-reasoning",
+    }
+    if (saved.model in renamed) saved.model = renamed[saved.model]
     const prefs = { settings: { ...DEFAULT_SETTINGS, ...saved }, currentId: raw.currentId ?? null }
     savePrefs(prefs.settings, prefs.currentId) // persist migrations (and carry legacy settings over)
     return prefs
