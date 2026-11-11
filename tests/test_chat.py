@@ -607,3 +607,19 @@ def test_truncated_tool_calls_respect_max_tokens(client, max_tokens):
         if r.choices[0].finish_reason == "tool_calls":
             for call in r.choices[0].message.tool_calls:
                 json.loads(call.function.arguments)  # complete calls carry valid JSON
+
+
+@pytest.mark.parametrize("cap", [2, 8, 16, 32, 48])
+def test_small_max_tokens_always_hits_the_cap(client, cap):
+    """Caps within the natural reply range are always reached, like a real model."""
+    for seed in range(8):
+        r = client.chat.completions.create(model="kiana", messages=USER, max_tokens=cap, seed=seed)
+        assert r.choices[0].finish_reason == "length"
+        assert r.usage.completion_tokens == cap
+        chunks = client.chat.completions.create(model="kiana", messages=USER, max_tokens=cap, seed=seed, stream=True)
+        assert [c.choices[0].finish_reason for c in chunks if c.choices and c.choices[0].finish_reason] == ["length"]
+
+
+def test_large_max_tokens_keeps_natural_length(client):
+    reasons = {client.chat.completions.create(model="kiana", messages=USER, max_tokens=500, seed=s).choices[0].finish_reason for s in range(10)}
+    assert reasons == {"stop"}

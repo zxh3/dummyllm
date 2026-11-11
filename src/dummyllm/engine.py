@@ -485,6 +485,11 @@ def generate_text(
         tokens = split_tokens(json.dumps(obj, ensure_ascii=False))
     else:
         target = meow.target_length(cfg.min_reply_tokens, cfg.max_reply_tokens)
+        # A small cap (within the natural reply range) is what clients use to test
+        # truncation, and a real model asked anything substantial runs into it:
+        # keep talking past the cap so it is hit (finish_reason "length").
+        if max_tokens is not None and max_tokens <= cfg.max_reply_tokens:
+            target = max(target, max_tokens + 1)
         tokens = meow.text(target, flavor)
 
     finish = "stop"

@@ -282,3 +282,9 @@ def test_function_call_over_budget_is_incomplete(client):
     assert r.usage.output_tokens <= 16
     calls = [o for o in r.output if o.type == "function_call"]
     assert calls and calls[-1].status == "incomplete"
+
+
+def test_small_max_output_tokens_is_incomplete(client):
+    r = client.responses.create(model="kiana", input="hi", max_output_tokens=16)
+    assert r.status == "incomplete" and r.incomplete_details.reason == "max_output_tokens"
+    assert r.usage.output_tokens == 16
