@@ -178,7 +178,7 @@ Every option is a CLI flag and a `DUMMYLLM_*` environment variable:
 | `--port` | `DUMMYLLM_PORT` | `8000` |
 | `--api-key` | `DUMMYLLM_API_KEY` | none (no auth) |
 | `--seed` | `DUMMYLLM_SEED` | none |
-| `--models` | `DUMMYLLM_MODELS` | `kiana,kiana-reasoning,kiana-vision,kiana-embed,kiana-image` |
+| `--models` | `DUMMYLLM_MODELS` | `kiana` |
 | `--min-reply-tokens` / `--max-reply-tokens` | `DUMMYLLM_MIN_REPLY_TOKENS` / `DUMMYLLM_MAX_REPLY_TOKENS` | `4` / `48` |
 | `--tool-call-probability` | `DUMMYLLM_TOOL_CALL_PROBABILITY` | `0.5` |
 | `--tool-call-probability-after-tool-result` | `DUMMYLLM_TOOL_CALL_PROBABILITY_AFTER_TOOL_RESULT` | `0.2` |

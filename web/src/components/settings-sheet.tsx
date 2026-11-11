@@ -52,8 +52,7 @@ export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="none">Off</SelectItem>
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="medium">Medium</SelectItem>
                   <SelectItem value="high">High</SelectItem>

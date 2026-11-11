@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   temperature: 1,
   maxTokens: "",
   seed: "",
-  reasoning: "default",
+  reasoning: "none",
   format: "text",
   stream: true,
   tools: false,
@@ -51,15 +51,11 @@ function loadPrefs(): { settings: Settings; currentId: string | null } {
     // the current defaults but keep values someone actually chose.
     if (saved.ttft === 450) delete saved.ttft
     if (saved.tps === 40) delete saved.tps
-    if (saved.reasoning === "none") delete saved.reasoning // old default meant "don't send"
-    // Models were renamed from meow-* to kiana-*.
-    const renamed: Record<string, string> = {
-      "meow-1": "kiana",
-      "meow-1-mini": "kiana",
-      "meow-1-vision": "kiana-vision",
-      "meow-reasoner": "kiana-reasoning",
-    }
-    if (saved.model in renamed) saved.model = renamed[saved.model]
+    if (saved.reasoning === "default") delete saved.reasoning
+    // Older builds had several models (meow-*, kiana-*); there is now just `kiana`.
+    // Someone who picked a reasoning model keeps thinking via the effort setting.
+    if (/reason/.test(saved.model ?? "") && !saved.reasoning) saved.reasoning = "medium"
+    if (/^(meow-|kiana-)/.test(saved.model ?? "")) saved.model = "kiana"
     const prefs = { settings: { ...DEFAULT_SETTINGS, ...saved }, currentId: raw.currentId ?? null }
     savePrefs(prefs.settings, prefs.currentId) // persist migrations (and carry legacy settings over)
     return prefs
@@ -315,7 +311,7 @@ export const useChat = create<State>()((set, get) => {
       method: "POST",
       signal,
       headers: apiHeaders(settings, { "x-dummyllm-ttft-ms": String(Math.max(1800, settings.ttft * 3)) }),
-      body: JSON.stringify({ model: IMAGE_MODEL, prompt: prompt || "a cat", size: "1024x1024", quality: "medium" }),
+      body: JSON.stringify({ model: IMAGE_MODEL, prompt: prompt || "a cat", size: "1024x1024", response_format: "b64_json" }),
     })
     if (!resp.ok) throw await toApiError(resp)
     const data = await resp.json()

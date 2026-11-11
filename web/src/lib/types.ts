@@ -61,8 +61,8 @@ export type Chat = {
   messages: Message[]
 }
 
-/** "default" omits reasoning_effort and lets the model decide (kiana-reasoning thinks). */
-export type ReasoningEffort = "default" | "none" | "low" | "medium" | "high"
+/** "none" omits reasoning_effort (kiana answers directly). */
+export type ReasoningEffort = "none" | "low" | "medium" | "high"
 export type ToolChoice = "auto" | "required" | "none"
 
 export type Settings = {

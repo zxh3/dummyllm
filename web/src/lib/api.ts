@@ -2,7 +2,7 @@ import { TOOLS } from "./tools"
 import type { AssistantMessage, Chat, Round, SendOptions, Settings, UserMessage } from "./types"
 
 export const API_BASE = `${window.location.origin}/v1`
-export const IMAGE_MODEL = "kiana-image"
+export const IMAGE_MODEL = "kiana"
 
 export class ApiError extends Error {
   status?: number
@@ -108,7 +108,7 @@ export function requestParams(settings: Settings, opts: SendOptions = {}): Recor
   if (settings.temperature !== 1) p.temperature = settings.temperature
   if (settings.maxTokens) p.max_completion_tokens = Number(settings.maxTokens)
   if (settings.seed !== "") p.seed = Number(settings.seed)
-  if (settings.reasoning !== "default") p.reasoning_effort = settings.reasoning
+  if (settings.reasoning !== "none") p.reasoning_effort = settings.reasoning
   if (settings.format === "json_object") p.response_format = { type: "json_object" }
   if (opts.tools ?? settings.tools) {
     p.tools = TOOLS

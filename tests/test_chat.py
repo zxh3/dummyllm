@@ -401,7 +401,7 @@ def test_json_object_response_format(client):
 
 def test_image_input(client):
     r = client.chat.completions.create(
-        model="kiana-vision",
+        model="kiana",
         messages=[
             {
                 "role": "user",
@@ -445,13 +445,13 @@ def test_invalid_image_data_rejected(client):
 
 
 def test_reasoning_effort(client):
-    r = client.chat.completions.create(model="kiana-reasoning", messages=USER, reasoning_effort="high")
+    r = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="high")
     assert r.usage.completion_tokens_details.reasoning_tokens > 0
     assert r.usage.completion_tokens > r.usage.completion_tokens_details.reasoning_tokens
 
 
 def test_reasoning_can_exhaust_budget(client):
-    r = client.chat.completions.create(model="kiana-reasoning", messages=USER, reasoning_effort="high", max_completion_tokens=5)
+    r = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="high", max_completion_tokens=5)
     assert r.choices[0].finish_reason == "length"
     assert r.choices[0].message.content == ""
     assert r.usage.completion_tokens == 5
@@ -544,12 +544,12 @@ def test_no_reasoning_without_effort(client):
     r = client.chat.completions.create(model="kiana", messages=USER)
     assert getattr(r.choices[0].message, "reasoning_content", None) is None
     assert r.usage.completion_tokens_details.reasoning_tokens == 0
-    r = client.chat.completions.create(model="kiana-reasoning", messages=USER, reasoning_effort="none")
+    r = client.chat.completions.create(model="my-reasoning-model", messages=USER, reasoning_effort="none")
     assert getattr(r.choices[0].message, "reasoning_content", None) is None
 
 
 def test_reasoning_model_thinks_by_default(client):
-    r = client.chat.completions.create(model="kiana-reasoning", messages=USER)
+    r = client.chat.completions.create(model="my-reasoning-model", messages=USER)
     assert r.choices[0].message.reasoning_content
     assert r.usage.completion_tokens_details.reasoning_tokens > 0
 

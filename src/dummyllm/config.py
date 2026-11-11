@@ -12,11 +12,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 DEFAULT_MODELS: tuple[str, ...] = (
-    "kiana",  # fast chat
-    "kiana-reasoning",  # thinks first (reasoning_content) by default
-    "kiana-vision",  # chat that reacts to images
-    "kiana-embed",  # embeddings
-    "kiana-image",  # image generation (base64 output)
+    # One model does everything: chat, reasoning (via reasoning_effort), vision,
+    # tools. Every endpoint also accepts any other model name.
+    "kiana",
 )
 
 
