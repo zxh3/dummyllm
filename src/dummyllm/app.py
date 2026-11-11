@@ -17,7 +17,7 @@ from . import __version__
 from .config import Config
 from .errors import APIError
 from .routes import chat, completions, embeddings, images, models, responses
-from .store import ResponseStore
+from .store import make_store
 
 _API_ROUTES: list[tuple[str, object, list[str]]] = [
     ("/chat/completions", chat.chat_completions, ["POST"]),
@@ -119,5 +119,5 @@ def create_app(config: Config | None = None) -> Starlette:
         ],
     )
     app.state.config = cfg
-    app.state.response_store = ResponseStore(cfg.response_store_size)
+    app.state.response_store = make_store(cfg.response_store, cfg.response_store_size)
     return app

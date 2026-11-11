@@ -205,9 +205,11 @@ Notes:
   an ASGI web function.)
 * **No auth.** The endpoint is public: any OpenAI client works with just `base_url`, and the
   playground opens in a browser. Set `DUMMYLLM_API_KEY` to require a key.
-* **One container.** `max_containers=1` keeps the in-memory Responses store
-  (`previous_response_id`, `GET /v1/responses/{id}`) consistent; `@modal.concurrent` lets that one
-  async container serve hundreds of requests at once.
+* **Concurrency.** Each container serves up to 500 requests at once (`@modal.concurrent`), and
+  Modal adds containers (up to 10) past ~100 in flight per container. The Responses store
+  (`previous_response_id`, `GET /v1/responses/{id}`) lives in a shared `modal.Dict`
+  (`--response-store modal-dict:<name>`), so every container sees every stored response. Locally
+  the default `--response-store memory` keeps them in process.
 * **Image URLs.** `DUMMYLLM_PUBLIC_URL` is set to the domain, so `response_format="url"` links point
   at `https://dummyllm.com`.
 

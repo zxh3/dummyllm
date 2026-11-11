@@ -33,7 +33,7 @@ from ..meow import Flavor, Meower
 from ..store import ResponseStore, StoredResponse
 from ..tokens import count_json_tokens, split_tokens
 
-REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh")
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 SUMMARY_MODES = ("auto", "concise", "detailed")
 TRUNCATION_MODES = ("auto", "disabled")
 
@@ -93,7 +93,7 @@ async def create_response(request: Request) -> Response:
     if prev_id is not None:
         if body.get("conversation") is not None:
             raise invalid("Cannot specify both 'previous_response_id' and 'conversation'.", "previous_response_id")
-        stored = _store(request).get(prev_id) if isinstance(prev_id, str) else None
+        stored = await _store(request).get(prev_id) if isinstance(prev_id, str) else None
         if stored is None:
             raise APIError(f"Previous response with id '{prev_id}' not found.", status=400, param="previous_response_id", code="previous_response_not_found")
         prior = stored.conversation
@@ -207,7 +207,7 @@ async def create_response(request: Request) -> Response:
         stored_inputs = [_with_id(it) for it in input_items]
         # Instructions are not carried over between chained responses (matches OpenAI).
         conversation = [*prior, *stored_inputs, *output]
-        _store(request).put(rid, StoredResponse(response=final, input_items=stored_inputs, conversation=conversation))
+        await _store(request).put(rid, StoredResponse(response=final, input_items=stored_inputs, conversation=conversation))
 
     if stream:
         events = _stream_events(final, tokens_by_item, logprobs_by_item)
@@ -406,7 +406,7 @@ def _stream_events(
 @endpoint
 async def get_response(request: Request) -> Response:
     rid = request.path_params["response_id"]
-    stored = _store(request).get(rid)
+    stored = await _store(request).get(rid)
     if stored is None:
         raise not_found(f"Response with id '{rid}' not found.", "response_id")
     return json_response(stored.response)
@@ -415,7 +415,7 @@ async def get_response(request: Request) -> Response:
 @endpoint
 async def delete_response(request: Request) -> Response:
     rid = request.path_params["response_id"]
-    if not _store(request).delete(rid):
+    if not await _store(request).delete(rid):
         raise not_found(f"Response with id '{rid}' not found.", "response_id")
     return json_response({"id": rid, "object": "response", "deleted": True})
 
@@ -423,7 +423,7 @@ async def delete_response(request: Request) -> Response:
 @endpoint
 async def cancel_response(request: Request) -> Response:
     rid = request.path_params["response_id"]
-    stored = _store(request).get(rid)
+    stored = await _store(request).get(rid)
     if stored is None:
         raise not_found(f"Response with id '{rid}' not found.", "response_id")
     if not stored.response.get("background"):
@@ -435,7 +435,7 @@ async def cancel_response(request: Request) -> Response:
 @endpoint
 async def list_input_items(request: Request) -> Response:
     rid = request.path_params["response_id"]
-    stored = _store(request).get(rid)
+    stored = await _store(request).get(rid)
     if stored is None:
         raise not_found(f"Response with id '{rid}' not found.", "response_id")
     order = request.query_params.get("order", "desc")
@@ -472,7 +472,7 @@ async def count_input_tokens(request: Request) -> Response:
     prior: list[dict[str, Any]] = []
     prev_id = body.get("previous_response_id")
     if prev_id is not None:
-        stored = _store(request).get(prev_id)
+        stored = await _store(request).get(prev_id)
         if stored is None:
             raise APIError(f"Previous response with id '{prev_id}' not found.", status=400, param="previous_response_id")
         prior = stored.conversation

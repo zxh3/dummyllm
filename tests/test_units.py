@@ -140,3 +140,46 @@ def test_schema_faker_survives_pathological_schemas(schema):
     t = time.perf_counter()
     fake_from_schema(schema, random.Random(0))
     assert time.perf_counter() - t < 1.0
+
+
+def test_modal_dict_store_roundtrip():
+    """The shared store speaks to modal.Dict through its `.aio` methods."""
+    import asyncio
+
+    from dummyllm.store import ModalDictStore, StoredResponse, make_store
+
+    class _Method:
+        def __init__(self, fn):
+            self.aio = fn
+
+    class FakeDict:
+        def __init__(self):
+            self.data = {}
+
+            async def put(k, v):
+                self.data[k] = v
+
+            async def get(k):
+                return self.data.get(k)
+
+            async def contains(k):
+                return k in self.data
+
+            async def pop(k):
+                return self.data.pop(k)
+
+            self.put, self.get, self.contains, self.pop = _Method(put), _Method(get), _Method(contains), _Method(pop)
+
+    store = ModalDictStore("x", dict_obj=FakeDict())
+    value = StoredResponse(response={"id": "resp_1"}, input_items=[{"type": "message"}], conversation=[{"role": "user"}])
+
+    async def go():
+        await store.put("resp_1", value)
+        assert await store.get("resp_1") == value
+        assert await store.get("nope") is None
+        assert await store.delete("resp_1") is True
+        assert await store.delete("resp_1") is False
+
+    asyncio.run(go())
+    with pytest.raises(ValueError):
+        make_store("redis:x", 10)

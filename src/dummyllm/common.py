@@ -138,8 +138,10 @@ def endpoint(fn: Handler) -> Handler:
             _maybe_inject_error(request, cfg)
             response = await fn(request)
         except APIError as exc:
-            if exc.status >= 500:
-                log.warning("%s %s -> %s %s", request.method, request.url.path, exc.status, exc.message)
+            # Log every rejection with its reason: invaluable when debugging a client.
+            log.warning(
+                "%s %s -> %s %s%s", request.method, request.url.path, exc.status, exc.message, f" (param={exc.param})" if exc.param else ""
+            )
             return error_response(exc, request_id)
         except Exception:  # pragma: no cover - defensive
             log.exception("unhandled error in %s", request.url.path)

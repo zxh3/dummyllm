@@ -31,6 +31,9 @@ SERVER_ENV = {
     "DUMMYLLM_LOG_LEVEL": "info",
     # Links dummyllm generates (image URLs) should point at the custom domain.
     "DUMMYLLM_PUBLIC_URL": f"https://{DOMAIN}",
+    # Responses API objects live in a shared modal.Dict, so any container can
+    # serve previous_response_id / GET /v1/responses/{id}.
+    "DUMMYLLM_RESPONSE_STORE": "modal-dict:dummyllm-responses",
 }
 
 image = (
@@ -50,14 +53,13 @@ app = modal.App("dummyllm", image=image)
     cpu=1.0,
     memory=1024,
     min_containers=0,
-    # One container: the Responses API store (previous_response_id,
-    # GET /v1/responses/{id}) lives in process memory, so every request must
-    # hit the same container.
-    max_containers=1,
+    # Scale out under load; state is shared via modal.Dict, so any container works.
+    max_containers=10,
     scaledown_window=600,
 )
-# dummyllm is fully async, so one container serves many requests at once.
-@modal.concurrent(max_inputs=500)
+# dummyllm is fully async: each container serves many requests at once, and the
+# autoscaler adds containers past ~100 in flight per container.
+@modal.concurrent(max_inputs=500, target_inputs=100)
 @modal.asgi_app(custom_domains=[DOMAIN])
 def web():
     from dummyllm import Config, create_app

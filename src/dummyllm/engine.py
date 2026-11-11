@@ -465,7 +465,7 @@ def generate_text(
     return tokens, finish
 
 
-REASONING_LENGTH = {"minimal": 0, "low": 16, "medium": 48, "high": 128, "xhigh": 256}
+REASONING_LENGTH = {"minimal": 0, "low": 16, "medium": 48, "high": 128, "xhigh": 256, "max": 384}
 
 
 def resolve_effort(model: str, effort: str | None) -> str | None:

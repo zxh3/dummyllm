@@ -30,7 +30,7 @@ from ..ids import fingerprint, make_rng, new_id, now
 from ..meow import Flavor
 from ..tokens import count_json_tokens, split_tokens
 
-REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh")
+REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh", "max")
 
 
 @endpoint

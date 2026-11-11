@@ -56,6 +56,9 @@ class Config:
 
     # Max number of stored Responses API objects (LRU).
     response_store_size: int = 1000
+    # Where Responses objects live: "memory" (per process) or
+    # "modal-dict:<name>" (shared across containers on Modal).
+    response_store: str = "memory"
 
     # Base URL used when building image URLs (``response_format="url"``).
     # Defaults to the URL the request came in on.

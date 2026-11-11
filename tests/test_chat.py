@@ -587,3 +587,9 @@ def test_reasoning_n_choices_are_independent(client):
     a, b = (c.message.reasoning_content for c in r.choices)
     assert a and b and a != b
     assert r.usage.completion_tokens_details.reasoning_tokens == count_tokens(a) + count_tokens(b)
+
+
+def test_reasoning_effort_max(client):
+    r = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="max", seed=3)
+    high = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="high", seed=3)
+    assert r.usage.completion_tokens_details.reasoning_tokens > high.usage.completion_tokens_details.reasoning_tokens

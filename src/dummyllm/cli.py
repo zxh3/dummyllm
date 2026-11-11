@@ -34,6 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tokens-per-second", "--tps", type=float, dest="tokens_per_second", help="simulated generation speed (0 = instant)")
     p.add_argument("--error-rate", type=float, help="fraction of requests failing with 429/500/503 (default 0)")
     p.add_argument("--response-store-size", type=int, help="max stored Responses API objects (default 1000)")
+    p.add_argument("--response-store", help="'memory' (default) or 'modal-dict:<name>' to share Responses across containers")
     p.add_argument("--public-url", help="base URL used in image URLs (default: request host)")
     p.add_argument("--log-level", choices=["critical", "error", "warning", "info", "debug", "trace"])
     return p
