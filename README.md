@@ -19,6 +19,11 @@ Mrrp rrrow. Prrr meow meow meow! *blinks slowly* Nya?
 **Try it:** the playground is at **<https://dummyllm.com>**, and the API is at
 `https://dummyllm.com/v1`. No key needed.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/playground-dark.png">
+  <img alt="The dummyllm playground: kiana thinks, calls a tool, answers in meows, then draws a pixel-art cat" src="docs/playground-light.png">
+</picture>
+
 ## Quick start
 
 Use the hosted endpoint:
