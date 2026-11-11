@@ -13,7 +13,11 @@ export function CodeDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   const [lang, setLang] = useState<SnippetLang>("python")
   const [copied, setCopied] = useState(false)
   const { chat, settings } = useChat(useShallow((s) => ({ chat: currentChat(s), settings: s.settings })))
-  const code = useMemo(() => (open ? snippet(lang, chat, settings) : ""), [open, lang, chat, settings])
+  // Only build the snippet while open, but keep the last one through the close
+  // animation; blanking it there would collapse and re-center the dialog mid-fade.
+  const live = useMemo(() => (open ? snippet(lang, chat, settings) : null), [open, lang, chat, settings])
+  const [code, setCode] = useState("")
+  if (live !== null && live !== code) setCode(live)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
