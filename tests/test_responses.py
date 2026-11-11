@@ -263,3 +263,22 @@ def test_reasoning_model_defaults_and_counts(client):
     plain = client.responses.create(model="kiana", input="hi")
     assert plain.usage.output_tokens_details.reasoning_tokens == 0
     assert all(o.type != "reasoning" for o in plain.output)
+
+
+def test_function_call_over_budget_is_incomplete(client):
+    big = {
+        "type": "function",
+        "name": "save_profile",
+        "parameters": {
+            "type": "object",
+            "properties": {k: {"type": "string"} for k in ("first", "last", "city", "street", "email", "bio")},
+            "required": ["first", "last", "city", "street", "email", "bio"],
+            "additionalProperties": False,
+        },
+    }
+    r = client.responses.create(model="kiana", input="save me", tools=[big], tool_choice="required", max_output_tokens=16)
+    assert r.status == "incomplete"
+    assert r.incomplete_details.reason == "max_output_tokens"
+    assert r.usage.output_tokens <= 16
+    calls = [o for o in r.output if o.type == "function_call"]
+    assert calls and calls[-1].status == "incomplete"

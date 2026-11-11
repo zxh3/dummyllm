@@ -17,7 +17,9 @@ from ..engine import (
     check_sampling,
     decide_tool_calls,
     fake_logprobs,
+    fit_tool_calls,
     generate_text,
+    tool_call_cost,
     make_tool_call,
     parse_responses_tools,
     generate_reasoning,
@@ -138,24 +140,28 @@ async def create_response(request: Request) -> Response:
         if max_tool_calls is not None:
             to_call = to_call[:max_tool_calls]
         drew = False
-        for spec in to_call:
-            call = make_tool_call(rng, spec, prompt)
-            if spec.kind == "function":
-                output.append(
-                    {"id": hex_id("fc"), "type": "function_call", "status": "completed", "arguments": call.arguments, "call_id": call.id, "name": call.name}
-                )
-                output_tokens += len(split_tokens(call.arguments)) + 3
-            elif spec.kind == "custom":
-                output.append(
-                    {"id": hex_id("ctc"), "type": "custom_tool_call", "status": "completed", "call_id": call.id, "input": call.arguments, "name": call.name}
-                )
-                output_tokens += len(split_tokens(call.arguments)) + 3
-            else:
+        made = [(spec, make_tool_call(rng, spec, prompt)) for spec in to_call]
+        # Client-side calls cost output tokens and must fit max_output_tokens.
+        fitted, cut = fit_tool_calls([c for s, c in made if s.kind != "image_generation"], budget)
+        kept = {id(c) for c in fitted}
+        for spec, call in made:
+            if spec.kind == "image_generation":
                 output.append(_image_item(rng, spec.options, call.arguments))
                 drew = True
+                continue
+            if id(call) not in kept:
+                continue
+            status = "incomplete" if cut and call is fitted[-1] else "completed"
+            if spec.kind == "function":
+                output.append({"id": hex_id("fc"), "type": "function_call", "status": status, "arguments": call.arguments, "call_id": call.id, "name": call.name})
+            else:
+                output.append({"id": hex_id("ctc"), "type": "custom_tool_call", "status": status, "call_id": call.id, "input": call.arguments, "name": call.name})
+            output_tokens += tool_call_cost(call)
+        if cut:
+            incomplete = True
 
         client_calls = any(it["type"] in ("function_call", "custom_tool_call") for it in output)
-        if not client_calls:
+        if not client_calls and not incomplete:
             flavor = Flavor(saw_image=prompt.saw_image, after_tool_result=prompt.after_tool_result, drew_image=drew)
             tokens, finish = generate_text(
                 rng, cfg, flavor=flavor, max_tokens=budget, fmt_kind=fmt_kind, schema=schema, strict=strict

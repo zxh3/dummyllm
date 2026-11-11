@@ -15,6 +15,7 @@ from ..engine import (
     check_sampling,
     decide_tool_calls,
     fake_logprobs,
+    fit_tool_calls,
     generate_text,
     make_tool_call,
     normalize_stop,
@@ -105,7 +106,9 @@ async def chat_completions(request: Request) -> Response:
         if to_call:
             gen.tool_calls = [make_tool_call(rng, s, prompt) for s in to_call]
             gen.finish_reason = "function_call" if legacy else "tool_calls"
-            _truncate_tool_calls(gen, budget)
+            gen.tool_calls, cut = fit_tool_calls(gen.tool_calls, budget)
+            if cut:
+                gen.finish_reason = "length"
         else:
             flavor = Flavor(saw_image=prompt.saw_image, after_tool_result=prompt.after_tool_result)
             gen.tokens, gen.finish_reason = generate_text(
@@ -163,27 +166,6 @@ async def chat_completions(request: Request) -> Response:
             "system_fingerprint": meta["system_fingerprint"],
         }
     )
-
-
-def _truncate_tool_calls(gen: Generation, budget: int | None) -> None:
-    """Apply max_tokens to tool-call arguments (yes, real models do this)."""
-    if budget is None:
-        return
-    used = 0
-    kept = []
-    for call in gen.tool_calls:
-        toks = split_tokens(call.arguments)
-        room = budget - used
-        if room <= 0:
-            break
-        if len(toks) > room:
-            call.arguments = "".join(toks[:room])
-            kept.append(call)
-            gen.finish_reason = "length"
-            break
-        used += len(toks)
-        kept.append(call)
-    gen.tool_calls = kept
 
 
 def _tool_call_obj(call) -> dict[str, Any]:

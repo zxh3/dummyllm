@@ -593,3 +593,17 @@ def test_reasoning_effort_max(client):
     r = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="max", seed=3)
     high = client.chat.completions.create(model="kiana", messages=USER, reasoning_effort="high", seed=3)
     assert r.usage.completion_tokens_details.reasoning_tokens > high.usage.completion_tokens_details.reasoning_tokens
+
+
+@pytest.mark.parametrize("max_tokens", [1, 4, 9, 14])
+def test_truncated_tool_calls_respect_max_tokens(client, max_tokens):
+    """Like OpenAI: usage never exceeds the cap, and hitting it reports `length`."""
+    for seed in range(15):
+        r = client.chat.completions.create(
+            model="kiana", messages=USER, tools=[WEATHER_TOOL, TIME_TOOL], tool_choice="required", max_tokens=max_tokens, seed=seed
+        )
+        assert r.usage.completion_tokens <= max_tokens
+        assert r.choices[0].finish_reason in ("length", "tool_calls")
+        if r.choices[0].finish_reason == "tool_calls":
+            for call in r.choices[0].message.tool_calls:
+                json.loads(call.function.arguments)  # complete calls carry valid JSON

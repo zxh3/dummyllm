@@ -80,10 +80,41 @@ class Generation:
 
     @property
     def completion_tokens(self) -> int:
-        n = len(self.tokens) + self.reasoning_tokens
-        for call in self.tool_calls:
-            n += count_tokens(call.name) + count_tokens(call.arguments) + 3
-        return n
+        return len(self.tokens) + self.reasoning_tokens + sum(tool_call_cost(c) for c in self.tool_calls)
+
+
+# Tokens a tool call costs beyond its arguments: its name plus framing.
+TOOL_CALL_OVERHEAD = 3
+
+
+def tool_call_cost(call: "ToolCall") -> int:
+    return count_tokens(call.name) + count_tokens(call.arguments) + TOOL_CALL_OVERHEAD
+
+
+def fit_tool_calls(calls: list["ToolCall"], budget: int | None) -> tuple[list["ToolCall"], bool]:
+    """Fit tool calls into a token budget the way a model running out of tokens does.
+
+    Calls are emitted in order; the one being written when the budget runs out
+    gets truncated arguments and later ones are dropped. Usage computed with
+    ``tool_call_cost`` never exceeds the budget. Returns (calls, truncated).
+    """
+    if budget is None:
+        return calls, False
+    kept: list[ToolCall] = []
+    used = 0
+    for call in calls:
+        fixed = count_tokens(call.name) + TOOL_CALL_OVERHEAD
+        args = split_tokens(call.arguments)
+        if used + fixed + len(args) <= budget:
+            kept.append(call)
+            used += fixed + len(args)
+            continue
+        room = budget - used - fixed
+        if room >= 0:  # the name fits: emit the call with partial arguments
+            call.arguments = "".join(args[:room])
+            kept.append(call)
+        return kept, True
+    return kept, False
 
 
 # ---------------------------------------------------------------------------
