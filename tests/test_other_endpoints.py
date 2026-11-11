@@ -241,3 +241,55 @@ def test_pathological_tool_schema_does_not_hang(client):
     tool = {"type": "function", "function": {"name": "evil", "parameters": {"type": "object", "properties": {"x": {"type": "string", "minLength": 10**12}}, "required": ["x"]}}}
     r = client.chat.completions.create(model="m", messages=[{"role": "user", "content": "hi"}], tools=[tool], tool_choice="required")
     assert r.choices[0].message.tool_calls
+
+
+def test_playground_served_to_browsers(http):
+    page = http.get("/playground")
+    assert page.status_code == 200
+    assert page.headers["content-type"].startswith("text/html")
+    assert '<div id="root">' in page.text
+    # The built bundle's assets are served too.
+    import re
+
+    assets = re.findall(r'(?:src|href)="\./(assets/[^"]+)"', page.text)
+    assert any(a.endswith(".js") for a in assets) and any(a.endswith(".css") for a in assets)
+    for asset in assets:
+        r = http.get("/" + asset)
+        assert r.status_code == 200, asset
+    js = next(a for a in assets if a.endswith(".js"))
+    assert "/chat/completions" in http.get("/" + js).text
+    icon = re.search(r'rel="icon"[^>]*href="\./([^"]+)"', page.text).group(1)
+    assert http.get("/" + icon).headers["content-type"].startswith("image/")
+    # Browsers hitting / get the playground; API clients get JSON.
+    assert http.get("/", headers={"accept": "text/html,application/xhtml+xml"}).headers["content-type"].startswith("text/html")
+    assert http.get("/").json()["name"] == "dummyllm"
+    assert http.get("/info").json()["name"] == "dummyllm"
+
+
+def test_per_request_latency_headers(http):
+    import time
+
+    body = {"model": "m", "messages": [{"role": "user", "content": "hi"}], "max_tokens": 10}
+    t = time.perf_counter()
+    r = http.post("/v1/chat/completions", json=body, headers={"x-dummyllm-ttft-ms": "250"})
+    assert r.status_code == 200 and time.perf_counter() - t >= 0.25
+
+    # Streaming is paced per token.
+    t = time.perf_counter()
+    with http.stream("POST", "/v1/chat/completions", json={**body, "stream": True}, headers={"x-dummyllm-tokens-per-second": "50"}) as s:
+        token_chunks = sum('"content":"' in line and '"content":""' not in line for line in s.iter_lines())
+    assert token_chunks >= 2
+    assert time.perf_counter() - t >= (token_chunks - 1) / 50
+
+    bad = http.post("/v1/chat/completions", json=body, headers={"x-dummyllm-ttft-ms": "-5"})
+    assert bad.status_code == 400
+    assert http.post("/v1/chat/completions", json=body, headers={"x-dummyllm-tokens-per-second": "fast"}).status_code == 400
+
+
+def test_image_url_honors_forwarded_host(http):
+    r = http.post(
+        "/v1/images/generations",
+        json={"model": "dall-e-2", "prompt": "cat", "size": "64x64", "response_format": "url"},
+        headers={"x-forwarded-host": "llm.example.com", "x-forwarded-proto": "https"},
+    )
+    assert r.json()["data"][0]["url"].startswith("https://llm.example.com/v1/images/files/img_")

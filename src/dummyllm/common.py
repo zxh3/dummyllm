@@ -4,6 +4,7 @@ latency simulation and Server-Sent Events."""
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import functools
 import json
 import logging
@@ -27,8 +28,29 @@ Handler = Callable[[Request], Awaitable[Response]]
 MAX_BODY_BYTES = 64 * 1024 * 1024
 
 
+# Per-request latency overrides (used by the playground for a realistic
+# typing feel without slowing down API clients): header -> (config field, max).
+_LATENCY_HEADERS = {
+    "x-dummyllm-ttft-ms": ("time_to_first_token_ms", 60_000.0),
+    "x-dummyllm-tokens-per-second": ("tokens_per_second", 10_000.0),
+}
+
+
 def cfg_of(request: Request) -> Config:
-    return request.app.state.config
+    """The server config, with any per-request ``x-dummyllm-*`` latency overrides applied."""
+    cached = getattr(request.state, "dummyllm_config", None)
+    if cached is not None:
+        return cached
+    cfg: Config = request.app.state.config
+    changes = {}
+    for header, (fieldname, hi) in _LATENCY_HEADERS.items():
+        value = header_float(request, header, 0.0, hi)
+        if value is not None:
+            changes[fieldname] = value
+    if changes:
+        cfg = dataclasses.replace(cfg, **changes)
+    request.state.dummyllm_config = cfg
+    return cfg
 
 
 async def read_json(request: Request) -> dict[str, Any]:
@@ -107,7 +129,7 @@ def endpoint(fn: Handler) -> Handler:
 
     @functools.wraps(fn)
     async def wrapper(request: Request) -> Response:
-        cfg = cfg_of(request)
+        cfg: Config = request.app.state.config
         request_id = "req_" + secrets.token_hex(16)
         request.state.request_id = request_id
         started = time.perf_counter()

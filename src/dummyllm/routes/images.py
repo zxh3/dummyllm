@@ -31,6 +31,11 @@ def _base_url(request: Request) -> str:
     public = cfg_of(request).public_url
     if public:
         return public.rstrip("/")
+    # Behind a reverse proxy, prefer the client-facing host it reports.
+    fwd_host = request.headers.get("x-forwarded-host")
+    if fwd_host:
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        return f"{proto.split(',')[0].strip()}://{fwd_host.split(',')[0].strip()}"
     return str(request.base_url).rstrip("/")
 
 

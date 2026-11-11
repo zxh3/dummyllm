@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
-from starlette.routing import Route
+from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from starlette.routing import Mount, Route
+from starlette.staticfiles import StaticFiles
 
 from . import __version__
 from .config import Config
@@ -39,7 +42,32 @@ async def health(request: Request) -> Response:
     return JSONResponse({"status": "ok", "meow": True})
 
 
+# The React playground, built from web/ by `npm run build`.
+PLAYGROUND_DIR = Path(__file__).parent / "static" / "playground"
+
+_NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>dummyllm</title>
+<body style="font:15px/1.6 system-ui;max-width:560px;margin:15vh auto;padding:0 20px">
+<h1 style="font-size:20px">The playground hasn't been built</h1>
+<p>The API is up at <code>/v1</code>. To build the chat UI, run:</p>
+<pre style="background:#f4f4f5;padding:12px;border-radius:8px">cd web &amp;&amp; npm install &amp;&amp; npm run build</pre></body>"""
+
+
+async def playground(request: Request) -> Response:
+    index = PLAYGROUND_DIR / "index.html"
+    if not index.is_file():
+        return HTMLResponse(_NOT_BUILT, status_code=503)
+    # Asset names are content-hashed; only the HTML needs revalidating.
+    return FileResponse(index, media_type="text/html; charset=utf-8", headers={"cache-control": "no-cache"})
+
+
 async def index(request: Request) -> Response:
+    # Browsers get the chat playground; API clients and curl get JSON.
+    if "text/html" in request.headers.get("accept", ""):
+        return await playground(request)
+    return await info(request)
+
+
+async def info(request: Request) -> Response:
     return JSONResponse(
         {
             "name": "dummyllm",
@@ -65,7 +93,13 @@ def create_app(config: Config | None = None) -> Starlette:
     cfg = config or Config.from_env()
     cfg.validate()
 
-    routes: list[Route] = [Route("/", index, methods=["GET"]), Route("/health", health, methods=["GET"])]
+    routes: list[Route | Mount] = [
+        Route("/", index, methods=["GET"]),
+        Route("/playground", playground, methods=["GET"]),
+        Route("/info", info, methods=["GET"]),
+        Route("/health", health, methods=["GET"]),
+        Mount("/assets", StaticFiles(directory=PLAYGROUND_DIR / "assets", check_dir=False), name="assets"),
+    ]
     # Serve under /v1 (canonical) and at the root (for clients configured without /v1).
     for prefix in ("/v1", ""):
         for path, handler, methods in _API_ROUTES:
