@@ -20,7 +20,8 @@ from ..engine import (
     generate_text,
     make_tool_call,
     parse_responses_tools,
-    reasoning_token_count,
+    generate_reasoning,
+    resolve_effort,
     require_model,
     resolve_tool_choice,
     response_format_kind,
@@ -76,6 +77,7 @@ async def create_response(request: Request) -> Response:
     effort = reasoning.get("effort")
     if effort is not None and effort not in REASONING_EFFORTS:
         raise invalid(f"Invalid value: '{effort}'. Supported values are: {', '.join(repr(e) for e in REASONING_EFFORTS)}.", "reasoning.effort", "invalid_value")
+    effort = resolve_effort(model, effort)
     summary_mode = reasoning.get("summary") or reasoning.get("generate_summary")
     if summary_mode is not None and summary_mode not in SUMMARY_MODES:
         raise invalid(f"Invalid value: '{summary_mode}'. Supported values are: 'auto', 'concise', and 'detailed'.", "reasoning.summary", "invalid_value")
@@ -115,7 +117,7 @@ async def create_response(request: Request) -> Response:
     output_tokens = 0
     incomplete = False
 
-    reasoning_tokens = reasoning_token_count(rng, effort)
+    reasoning_tokens = len(generate_reasoning(rng, effort))
     budget = None if max_output_tokens is None else max_output_tokens
     if reasoning_tokens or (effort not in (None, "none") and summary_mode):
         item: dict[str, Any] = {"id": hex_id("rs"), "type": "reasoning", "summary": []}

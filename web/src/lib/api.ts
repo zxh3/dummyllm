@@ -108,7 +108,7 @@ export function requestParams(settings: Settings, opts: SendOptions = {}): Recor
   if (settings.temperature !== 1) p.temperature = settings.temperature
   if (settings.maxTokens) p.max_completion_tokens = Number(settings.maxTokens)
   if (settings.seed !== "") p.seed = Number(settings.seed)
-  if (settings.reasoning !== "none") p.reasoning_effort = settings.reasoning
+  if (settings.reasoning !== "default") p.reasoning_effort = settings.reasoning
   if (settings.format === "json_object") p.response_format = { type: "json_object" }
   if (opts.tools ?? settings.tools) {
     p.tools = TOOLS

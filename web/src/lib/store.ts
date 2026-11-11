@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: Settings = {
   temperature: 1,
   maxTokens: "",
   seed: "",
-  reasoning: "none",
+  reasoning: "default",
   format: "text",
   stream: true,
   tools: false,
@@ -51,6 +51,7 @@ function loadPrefs(): { settings: Settings; currentId: string | null } {
     // the current defaults but keep values someone actually chose.
     if (saved.ttft === 450) delete saved.ttft
     if (saved.tps === 40) delete saved.tps
+    if (saved.reasoning === "none") delete saved.reasoning // old default meant "don't send"
     const prefs = { settings: { ...DEFAULT_SETTINGS, ...saved }, currentId: raw.currentId ?? null }
     savePrefs(prefs.settings, prefs.currentId) // persist migrations (and carry legacy settings over)
     return prefs
@@ -208,6 +209,7 @@ export const useChat = create<State>()((set, get) => {
 
     for (let round = 0; round < 6; round++) {
       const r: Round = { content: "", toolCalls: [], finish: null }
+      let thinkStart: number | undefined
       draft.rounds.push(r)
       const chat = get().chats.find((c) => c.id === chatId)!
       const messages = buildMessages(chat, chat.messages.findIndex((m) => m.id === draft.id), settings)
@@ -235,12 +237,20 @@ export const useChat = create<State>()((set, get) => {
           const choice = chunk.choices?.[0]
           if (!choice) continue
           const delta = choice.delta ?? {}
+          const now = performance.now()
+          if (delta.reasoning_content) {
+            r.reasoning = (r.reasoning ?? "") + delta.reasoning_content
+            thinkStart ??= now
+            firstAt ??= now
+          }
+          // The first answer token ends the thinking phase.
+          if ((delta.content || delta.tool_calls) && thinkStart !== undefined && r.thinkingMs === undefined) r.thinkingMs = now - thinkStart
           if (delta.content) {
             r.content += delta.content
-            firstAt ??= performance.now()
+            firstAt ??= now
           }
           for (const tc of delta.tool_calls ?? []) {
-            firstAt ??= performance.now()
+            firstAt ??= now
             const call = (r.toolCalls[tc.index] ??= { id: "", name: "", arguments: "" })
             if (tc.id) call.id = tc.id
             if (tc.function?.name) call.name = tc.function.name
@@ -254,6 +264,7 @@ export const useChat = create<State>()((set, get) => {
         firstAt ??= performance.now()
         const choice = data.choices[0]
         r.content = choice.message.content ?? ""
+        if (choice.message.reasoning_content) r.reasoning = choice.message.reasoning_content
         r.toolCalls = (choice.message.tool_calls ?? []).map((c: { id: string; function: { name: string; arguments: string } }) => ({
           id: c.id,
           name: c.function.name,

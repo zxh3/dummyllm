@@ -19,7 +19,8 @@ from ..engine import (
     make_tool_call,
     normalize_stop,
     parse_chat_tools,
-    reasoning_token_count,
+    generate_reasoning,
+    resolve_effort,
     require_model,
     resolve_tool_choice,
     response_format_kind,
@@ -72,6 +73,7 @@ async def chat_completions(request: Request) -> Response:
             "invalid_value",
         )
 
+    effort = resolve_effort(model, effort)
     prompt = analyze_chat_messages(body.get("messages"))
     legacy = body.get("functions") is not None
     specs = parse_chat_tools(body.get("tools"), body.get("functions"))
@@ -91,11 +93,11 @@ async def chat_completions(request: Request) -> Response:
     gens: list[Generation] = []
     for _ in range(n):
         gen = Generation()
-        gen.reasoning_tokens = reasoning_token_count(rng, effort)
+        gen.reasoning = generate_reasoning(rng, effort)
         budget = None if max_tokens is None else max_tokens - gen.reasoning_tokens
         if budget is not None and budget <= 0:
             # Burned the whole budget thinking: empty content, finish_reason=length.
-            gen.reasoning_tokens = max_tokens
+            gen.reasoning = gen.reasoning[:max_tokens]
             gen.finish_reason = "length"
             gens.append(gen)
             continue
@@ -197,6 +199,9 @@ def _message(gen: Generation, legacy: bool) -> dict[str, Any]:
         "refusal": None,
         "annotations": [],
     }
+    if gen.reasoning:
+        # DeepSeek/vLLM-style field used by OpenAI-compatible reasoning servers.
+        msg["reasoning_content"] = gen.reasoning_text
     if gen.tool_calls:
         if legacy:
             call = gen.tool_calls[0]
@@ -236,8 +241,13 @@ def _stream_events(
         def ch(delta: dict[str, Any], *, finish: str | None = None, lp: Any = None, tokens: int = 0, _i: int = i) -> SSE:
             return chunk({"index": _i, "delta": delta, "logprobs": lp, "finish_reason": finish}, tokens)
 
+        def thinking() -> None:
+            for tok in gen.reasoning:
+                evs.append(ch({"reasoning_content": tok}, tokens=1))
+
         if gen.tool_calls:
             evs.append(ch({"role": "assistant", "content": None, "refusal": None}))
+            thinking()
             for k, call in enumerate(gen.tool_calls):
                 frags = split_tokens(call.arguments)
                 if legacy:
@@ -257,6 +267,7 @@ def _stream_events(
                         evs.append(ch({"tool_calls": [{"index": k, "function": {"arguments": frag}}]}, tokens=1))
         else:
             evs.append(ch({"role": "assistant", "content": "", "refusal": None}, lp={"content": [], "refusal": None} if lps is not None else None))
+            thinking()
             for j, tok in enumerate(gen.tokens):
                 lp = {"content": [lps[j]], "refusal": None} if lps is not None else None
                 evs.append(ch({"content": tok}, lp=lp, tokens=1))

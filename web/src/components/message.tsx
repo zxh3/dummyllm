@@ -41,7 +41,6 @@ export const AssistantTurn = memo(function AssistantTurn({
 }) {
   const regenerate = useChat((s) => s.regenerate)
   const busy = useChat((s) => s.busy)
-  const reasoningOn = useChat((s) => s.settings.reasoning !== "none")
   const streaming = !message.done
   const rounds = message.rounds
   const lastRound = rounds.at(-1)
@@ -49,16 +48,19 @@ export const AssistantTurn = memo(function AssistantTurn({
   const waiting =
     streaming &&
     !message.image &&
-    (!lastRound || (!lastRound.content && !lastRound.toolCalls.length) || (lastRound.toolCalls.length > 0 && lastRound.toolCalls.every((c) => c.result !== undefined)))
+    (!lastRound ||
+      (!lastRound.content && !lastRound.toolCalls.length && !lastRound.reasoning) ||
+      (lastRound.toolCalls.length > 0 && lastRound.toolCalls.every((c) => c.result !== undefined)))
   const text = message.image ? message.caption ?? "" : rounds.map((r) => r.content).filter(Boolean).join("\n\n")
 
   return (
     <div className={cn("group/turn", animate && "animate-in fade-in-0 duration-300 ease-snappy")}>
       <div className="space-y-2.5">
-        {!!message.meta.reasoning && <p className="text-sm text-muted-foreground">Thought for {message.meta.reasoning} tokens</p>}
-
         {rounds.map((r, ri) => (
           <div key={ri} className="space-y-2.5">
+            {r.reasoning && (
+              <ThinkingBlock text={r.reasoning} active={streaming && ri === rounds.length - 1 && !r.content && !r.toolCalls.length} ms={r.thinkingMs} />
+            )}
             {r.toolCalls.length > 0 && (
               <div className="space-y-1">
                 {r.toolCalls.map((call, ci) => (
@@ -76,7 +78,6 @@ export const AssistantTurn = memo(function AssistantTurn({
         {waiting && (
           <div className="flex h-6 items-center gap-2.5">
             <span className="size-2 animate-pulse rounded-full bg-foreground" />
-            {reasoningOn && <span className="shimmer text-sm text-muted-foreground">Thinking</span>}
           </div>
         )}
 
@@ -116,6 +117,28 @@ export const AssistantTurn = memo(function AssistantTurn({
     </div>
   )
 })
+
+/** The model's reasoning: open while it streams, then folds into "Thought for 1.2s". */
+function ThinkingBlock({ text, active, ms }: { text: string; active: boolean; ms?: number }) {
+  const [open, setOpen] = useState(false)
+  const shown = useSmoothText(text, active)
+  const expanded = active || open
+  const label = active ? "Thinking" : ms ? `Thought for ${ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`}` : "Thought"
+  return (
+    <Collapsible open={expanded} onOpenChange={setOpen}>
+      <CollapsibleTrigger
+        disabled={active}
+        className="group/think inline-flex items-center gap-1 rounded-md py-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:cursor-default"
+      >
+        <span className={cn(active && "shimmer")}>{label}</span>
+        <ChevronRightIcon className={cn("size-3.5 transition-transform", expanded && "rotate-90", active && "opacity-0")} />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="mt-1.5 border-l-2 border-border pl-3 text-[13.5px] leading-relaxed whitespace-pre-wrap text-muted-foreground">{shown}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
 
 /** A round's text, revealed smoothly while it streams. */
 function RoundText({ text, streaming }: { text: string; streaming: boolean }) {

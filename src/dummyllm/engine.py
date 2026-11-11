@@ -64,7 +64,15 @@ class Generation:
     tokens: list[str] = field(default_factory=list)
     tool_calls: list[ToolCall] = field(default_factory=list)
     finish_reason: str = "stop"  # stop | length | tool_calls
-    reasoning_tokens: int = 0
+    reasoning: list[str] = field(default_factory=list)  # thinking tokens, emitted before the answer
+
+    @property
+    def reasoning_tokens(self) -> int:
+        return len(self.reasoning)
+
+    @property
+    def reasoning_text(self) -> str:
+        return "".join(self.reasoning)
 
     @property
     def text(self) -> str:
@@ -457,11 +465,22 @@ def generate_text(
     return tokens, finish
 
 
-def reasoning_token_count(rng: random.Random, effort: str | None) -> int:
-    if effort in (None, "none"):
-        return 0
-    base = {"minimal": 0, "low": 16, "medium": 64, "high": 256, "xhigh": 512}.get(effort, 64)
-    return base + rng.randint(0, max(1, base // 2)) if base else 0
+REASONING_LENGTH = {"minimal": 0, "low": 16, "medium": 48, "high": 128, "xhigh": 256}
+
+
+def resolve_effort(model: str, effort: str | None) -> str | None:
+    """Explicit effort wins; reasoning-flavoured model names think by default."""
+    if effort is not None:
+        return effort
+    return "medium" if "reason" in model.lower() else None
+
+
+def generate_reasoning(rng: random.Random, effort: str | None) -> list[str]:
+    """Thinking tokens for the given effort (empty for none/minimal)."""
+    base = REASONING_LENGTH.get(effort or "none", 0)
+    if not base:
+        return []
+    return Meower(rng).thoughts(base + rng.randint(0, base // 2))
 
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,10 @@ export type ToolCall = {
 
 /** One model call. A turn with tool use has several: calls, then the answer. */
 export type Round = {
+  /** Streamed `reasoning_content` (the model's thinking, shown before the answer). */
+  reasoning?: string
+  /** How long the thinking phase took, for "Thought for 1.2s". */
+  thinkingMs?: number
   content: string
   toolCalls: ToolCall[]
   finish?: string | null
@@ -57,7 +61,8 @@ export type Chat = {
   messages: Message[]
 }
 
-export type ReasoningEffort = "none" | "low" | "medium" | "high"
+/** "default" omits reasoning_effort and lets the model decide (meow-reasoner thinks). */
+export type ReasoningEffort = "default" | "none" | "low" | "medium" | "high"
 export type ToolChoice = "auto" | "required" | "none"
 
 export type Settings = {

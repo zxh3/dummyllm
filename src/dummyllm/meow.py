@@ -37,6 +37,15 @@ DRAWING_ACTIONS: tuple[str, ...] = (
     "paints with its paws",
 )
 
+THINK_OPENERS: tuple[str, ...] = (
+    "Hmm.", "Okay, mrrp.", "Wait...", "Let me think.", "Mrrp?", "Hmm, the human wants something.",
+    "Actually, no.", "Let me reconsider.", "So...",
+)
+THINK_ACTIONS: tuple[str, ...] = (
+    "considers the request", "weighs the options", "stares at the problem", "paces back and forth",
+    "chases a stray thought", "double-checks with a paw", "squints thoughtfully",
+)
+
 CAT_NAMES: tuple[str, ...] = (
     "Whiskers", "Mittens", "Luna", "Oliver", "Leo", "Milo", "Cleo", "Simba",
     "Nala", "Tom", "Felix", "Garfield", "Pumpkin", "Mochi", "Biscuit", "Socks",
@@ -139,6 +148,20 @@ class Meower:
             return lo
         u = self.rng.random()
         return lo + int(math.floor((hi - lo + 1) * (u**1.6)))
+
+    def thoughts(self, target_tokens: int) -> list[str]:
+        """Reasoning text: hesitant, self-questioning cat noises (as tokens)."""
+        tokens: list[str] = []
+        while len(tokens) < target_tokens:
+            r = self.rng.random()
+            if r < 0.22:
+                piece = self.rng.choice(THINK_OPENERS)
+            elif r < 0.4:
+                piece = f"*{self.rng.choice(THINK_ACTIONS)}*"
+            else:
+                piece = self.sentence()
+            tokens.extend(split_tokens((" " if tokens else "") + piece))
+        return tokens
 
     def reasoning_summary(self) -> str:
         title = self.rng.choice(

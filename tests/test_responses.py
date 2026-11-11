@@ -253,3 +253,13 @@ def test_hosted_tools_are_ignored(client):
 def test_missing_input(client):
     with pytest.raises(openai.BadRequestError):
         client.responses.create(model="m")
+
+
+def test_reasoning_model_defaults_and_counts(client):
+    r = client.responses.create(model="meow-reasoner", input="think about it")
+    assert r.usage.output_tokens_details.reasoning_tokens > 0
+    assert r.output[0].type == "reasoning"
+    assert r.reasoning.effort == "medium"
+    plain = client.responses.create(model="meow-1", input="hi")
+    assert plain.usage.output_tokens_details.reasoning_tokens == 0
+    assert all(o.type != "reasoning" for o in plain.output)

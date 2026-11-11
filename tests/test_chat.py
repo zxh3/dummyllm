@@ -515,3 +515,75 @@ def test_multimodal_content_parts_and_developer_role(client):
         ],
     )
     assert r.choices[0].message.content
+
+
+# ---------------------------------------------------------------------------
+# Reasoning (DeepSeek/vLLM-style `reasoning_content`)
+
+from dummyllm.tokens import count_tokens  # noqa: E402
+
+
+def test_reasoning_content_non_streaming(client):
+    r = client.chat.completions.create(model="meow-1", messages=USER, reasoning_effort="medium")
+    msg = r.choices[0].message
+    thinking = msg.reasoning_content  # extra field, exposed by the SDK's permissive models
+    assert isinstance(thinking, str) and thinking
+    assert msg.content and thinking != msg.content
+    assert r.usage.completion_tokens_details.reasoning_tokens == count_tokens(thinking)
+    assert r.usage.completion_tokens == count_tokens(thinking) + count_tokens(msg.content)
+
+
+def test_reasoning_effort_scales_length(client):
+    def n(effort):
+        return client.chat.completions.create(model="m", messages=USER, reasoning_effort=effort, seed=1).usage.completion_tokens_details.reasoning_tokens
+
+    assert 0 < n("low") < n("high")
+
+
+def test_no_reasoning_without_effort(client):
+    r = client.chat.completions.create(model="meow-1", messages=USER)
+    assert getattr(r.choices[0].message, "reasoning_content", None) is None
+    assert r.usage.completion_tokens_details.reasoning_tokens == 0
+    r = client.chat.completions.create(model="meow-reasoner", messages=USER, reasoning_effort="none")
+    assert getattr(r.choices[0].message, "reasoning_content", None) is None
+
+
+def test_reasoning_model_thinks_by_default(client):
+    r = client.chat.completions.create(model="meow-reasoner", messages=USER)
+    assert r.choices[0].message.reasoning_content
+    assert r.usage.completion_tokens_details.reasoning_tokens > 0
+
+
+def test_reasoning_streams_before_content(client):
+    kwargs = dict(model="m", messages=USER, reasoning_effort="low", seed=21)
+    full = client.chat.completions.create(**kwargs)
+    phases, thinking, text = [], "", ""
+    for chunk in client.chat.completions.create(**kwargs, stream=True, stream_options={"include_usage": True}):
+        if not chunk.choices:
+            assert chunk.usage.completion_tokens_details.reasoning_tokens == full.usage.completion_tokens_details.reasoning_tokens
+            continue
+        d = chunk.choices[0].delta
+        r = getattr(d, "reasoning_content", None)
+        if r:
+            thinking += r
+            phases.append("think")
+        if d.content:
+            text += d.content
+            phases.append("answer")
+    assert phases.index("answer") > phases.index("think")
+    assert "think" not in phases[phases.index("answer") :]
+    assert thinking == full.choices[0].message.reasoning_content
+    assert text == full.choices[0].message.content
+
+
+def test_reasoning_with_tool_calls(client):
+    r = client.chat.completions.create(model="m", messages=USER, tools=[WEATHER_TOOL], tool_choice="required", reasoning_effort="low")
+    msg = r.choices[0].message
+    assert msg.reasoning_content and msg.tool_calls and msg.content is None
+
+
+def test_reasoning_n_choices_are_independent(client):
+    r = client.chat.completions.create(model="m", messages=USER, reasoning_effort="low", n=2)
+    a, b = (c.message.reasoning_content for c in r.choices)
+    assert a and b and a != b
+    assert r.usage.completion_tokens_details.reasoning_tokens == count_tokens(a) + count_tokens(b)
