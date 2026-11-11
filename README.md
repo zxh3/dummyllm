@@ -2,185 +2,198 @@
 
 An **OpenAI-compatible LLM server that only speaks cat.**
 
-Point any OpenAI client at it and you get well-formed, spec-shaped responses — chat, streaming,
-tool calls, structured outputs, vision input, image generation, embeddings — except every word is
-`meow`, `mrrp`, `purr` or `*knocks your coffee off the desk*`.
+Point any OpenAI client at it and you get well-formed, spec-shaped responses (chat, streaming,
+tool calls, structured outputs, reasoning, vision input, image generation, embeddings), except
+every word is `meow`, `mrrp`, `purr` or `*knocks your coffee off the desk*`.
 
 It's built for **testing LLM applications without an LLM**: fast, free, offline, deterministic
-when you want it, and strict about request validation the same way the real API is, so client
-bugs surface locally instead of in production.
+when you want it, and as strict about request validation as the real API, so client bugs show up
+locally instead of in production.
 
 ```text
-$ curl -s localhost:8000/v1/chat/completions -d '{"model":"kiana","messages":[{"role":"user","content":"hi"}]}' | jq -r '.choices[0].message.content'
+$ curl -s https://dummyllm.com/v1/chat/completions \
+    -d '{"model":"kiana","messages":[{"role":"user","content":"hi"}]}' | jq -r '.choices[0].message.content'
 Mrrp rrrow. Prrr meow meow meow! *blinks slowly* Nya?
 ```
 
+**Try it:** the playground is at **<https://dummyllm.com>**, and the API is at
+`https://dummyllm.com/v1`. No key needed.
+
 ## Quick start
 
-```bash
-uv sync
-uv run dummyllm                      # http://127.0.0.1:8000/v1
-```
+Use the hosted endpoint:
 
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="anything")
-print(client.chat.completions.create(model="kiana", messages=[{"role": "user", "content": "hi"}]).choices[0].message.content)
+client = OpenAI(base_url="https://dummyllm.com/v1", api_key="anything")
+reply = client.chat.completions.create(model="kiana", messages=[{"role": "user", "content": "hi"}])
+print(reply.choices[0].message.content)
+```
+
+Or run it locally (needs [uv](https://docs.astral.sh/uv/)):
+
+```bash
+uvx --from git+https://github.com/zxh3/dummyllm dummyllm   # http://127.0.0.1:8000/v1
 ```
 
 Or with Docker:
 
 ```bash
+git clone https://github.com/zxh3/dummyllm && cd dummyllm
 docker build -t dummyllm .
 docker run -p 8000:8000 dummyllm
 ```
 
-Any model name is accepted (`gpt-4o`, `o3`, `whatever`) and echoed back, so you can usually swap
-dummyllm in by changing only `base_url`.
+Any model name is accepted (`gpt-4o`, `o3`, `whatever`) and echoed back, so swapping dummyllm in
+usually means changing only `base_url`. The advertised model is `kiana`, which does chat,
+reasoning, vision and tools.
+
+The hosted endpoint is a shared demo. For load tests or CI, run your own copy.
 
 ## Playground
 
-Open the server root in a browser (<http://127.0.0.1:8000/>) for a chat UI built with React,
-Tailwind CSS and shadcn/ui. It has:
+Open the server root in a browser (<http://127.0.0.1:8000/> locally) for a chat UI with:
 
-* a conversation history sidebar; chats are stored in your browser (IndexedDB, one record per chat), settings in localStorage
-* light and dark themes
-* a model picker and streaming replies with TTFT / tokens / tok/s stats
-* tool calling, with demo tools that "run" in the browser and feed results back to the model
+* streaming replies with time-to-first-token and tokens/s stats
+* a reasoning effort setting that shows the "thinking" as it streams
+* tool calling, with demo tools that "run" in the browser and feed their results back
 * image uploads (vision input) and image generation
-* a reasoning-effort setting, JSON mode, system instructions, seed and max tokens
-* a **Reply length** slider (sends `x-dummyllm-reply-tokens`; *auto* keeps the server's natural length)
-* a **View code** dialog that turns the current conversation into Python, Node.js or curl
+* system instructions, temperature, reply length, max tokens, seed and JSON mode
+* **View code**, which turns the current conversation into Python, Node.js or curl
+* chat history kept in your browser (IndexedDB), light and dark themes, and a mobile layout
 
-The playground asks the server to simulate a realistic typing speed via per-request headers
-(see *Latency simulation*), so API clients are unaffected. curl and SDKs hitting `/` still get
-JSON (the page is served to `Accept: text/html`). The UI is also at `/playground`, and the JSON
-index at `/info`.
-
-The UI source lives in [`web/`](web/). Its production build is committed to
-`src/dummyllm/static/playground/`, so the Python package serves it without needing Node. To work
-on it:
-
-```bash
-uv run dummyllm                 # API on :8000
-cd web && npm install
-npm run dev                     # Vite on :5173, proxies /v1 to :8000 (override with DUMMYLLM_URL)
-npm run build                   # rebuild the bundle shipped in the Python package
-```
+API clients aren't affected by the UI: requests to `/` without `Accept: text/html` get a JSON
+index (also at `/info`), and the UI is also served at `/playground`.
 
 ## What's supported
 
-| Endpoint | Notes |
+| Endpoint | Highlights |
 |---|---|
-| `POST /v1/chat/completions` | streaming (+`include_usage`), `n`, `max_tokens`/`max_completion_tokens`, `stop`, `logprobs`/`top_logprobs`, `seed`, **tools** (function + custom), `tool_choice` (`auto`/`none`/`required`/named/`allowed_tools`), `parallel_tool_calls`, legacy `functions`/`function_call`, `response_format` (`json_object`, `json_schema` → works with `client.chat.completions.parse(...)`), **image inputs** (`image_url`, data URLs and https), **reasoning**: thinking text in `message.reasoning_content` / streamed `delta.reasoning_content` (the DeepSeek/vLLM convention), sized by `reasoning_effort` and counted in `reasoning_tokens`; models named `*reason*` think by default |
-| `POST /v1/responses` | string or item-list `input`, `instructions`, streaming with the full typed event protocol, function / custom tool calls, **`image_generation` tool** (incl. `partial_images`), `previous_response_id`, `store`, `background`, `text.format` (works with `client.responses.parse(...)`), `reasoning` (+ summaries), `max_output_tokens` → `incomplete`, `include=["message.output_text.logprobs", "reasoning.encrypted_content"]` |
-| `GET/DELETE /v1/responses/{id}`, `GET /v1/responses/{id}/input_items`, `POST /v1/responses/{id}/cancel`, `POST /v1/responses/input_tokens` | in-memory LRU store |
-| `POST /v1/completions` | legacy text completions: multi-prompt, `n`, `echo`, `logprobs`, streaming |
-| `POST /v1/embeddings` | float **and base64** (the SDK default), `dimensions`; vectors are unit-length and deterministic per input |
-| `POST /v1/images/generations`, `/edits`, `/variations` | real PNGs of procedurally drawn cats at the requested size; `b64_json` or `url` |
-| `GET /v1/models`, `GET /v1/models/{id}` | |
-| `GET /health` | |
-| `GET /` (browsers), `GET /playground` | chat playground UI |
+| `POST /v1/chat/completions` | streaming (+ `include_usage`), tools, structured outputs, reasoning, image inputs, logprobs (details below) |
+| `POST /v1/responses` | the full streaming event protocol, function and custom tools, the `image_generation` tool, `previous_response_id`, `store`, `background`, `text.format`, `reasoning` with summaries |
+| `GET`/`DELETE /v1/responses/{id}`, `GET …/input_items`, `POST …/cancel`, `POST /v1/responses/input_tokens` | stored responses |
+| `POST /v1/completions` | legacy completions: multiple prompts, `n`, `echo`, `logprobs`, streaming |
+| `POST /v1/embeddings` | float and base64 (the SDK default), `dimensions`; unit-length vectors, deterministic per input |
+| `POST /v1/images/generations`, `/edits`, `/variations` | real PNGs of procedurally drawn cats at the requested size, as `b64_json` or `url` |
+| `GET /v1/models`, `GET /v1/models/{id}`, `GET /health` | |
 
-Routes are also served without the `/v1` prefix.
+Every route also works without the `/v1` prefix.
 
-Not implemented: audio, files/uploads, batches, fine-tuning, assistants, vector stores, realtime.
+**Chat Completions in detail:** `n`, `max_tokens` / `max_completion_tokens`, `stop`,
+`logprobs` / `top_logprobs`, `seed`, function and custom tools, every `tool_choice` form (`auto`,
+`none`, `required`, a named tool, `allowed_tools`), `parallel_tool_calls`, legacy `functions` /
+`function_call`, `response_format` (`json_object`, and `json_schema`, which works with
+`client.chat.completions.parse(...)`), and image inputs (data URLs and https).
+
+**Reasoning:** `reasoning_effort` (`minimal` through `xhigh` and `max`) makes the model think
+before answering. Chat Completions returns the thinking in `message.reasoning_content` (streamed as
+`delta.reasoning_content`, the DeepSeek / vLLM convention); the Responses API returns reasoning
+items. Thinking counts toward `reasoning_tokens`. Model names containing `reason` think by default.
+
+**Not implemented:** audio, files, batches, fine-tuning, assistants, vector stores and realtime.
 Hosted Responses tools other than `image_generation` (web search, file search, code interpreter,
-MCP...) are accepted but never called.
+MCP) are accepted but never called.
 
 ## How the cat behaves
 
 **Text.** Replies are sentences of cat sounds with the occasional `*action*`. The cat reacts to
-context: it sniffs images you send, bats at tool results, and proudly presents drawings.
+context: it sniffs images you send, bats at tool results, and proudly presents its drawings.
 
 **Tool calls.** When tools are offered:
 
-* `tool_choice="required"` or a named tool → always calls.
-* `tool_choice="none"` → never calls.
-* `tool_choice="auto"` → calls with probability `tool_call_probability` (default 0.5), dropping to
-  `tool_call_probability_after_tool_result` (default 0.2) right after a tool result, so agent loops
-  terminate.
-* With `parallel_tool_calls` (default on) it sometimes calls 2–3 distinct tools at once.
+* `tool_choice="required"` or a named tool: always calls.
+* `tool_choice="none"`: never calls.
+* `tool_choice="auto"`: calls with probability 0.5, dropping to 0.2 right after a tool result so
+  agent loops end.
+* With `parallel_tool_calls` (on by default) it sometimes calls 2–3 different tools at once.
 * Arguments are **random values that validate against the tool's JSON Schema**: types, `required`,
-  `enum`, `const`, `anyOf`/`oneOf`/`allOf`, `$ref`/`$defs` (including recursive schemas), min/max,
-  `multipleOf`, string `format`s (date-time, email, uuid, uri...), nullable types, `prefixItems`...
-  Property names flavor the values (`city` → `"Meowtown"`, `name` → `"Whiskers"`).
-* In the Responses API, if an `image_generation` tool is available and the user asks to
-  draw/paint/picture something, the cat draws.
+  `enum`, `const`, `anyOf` / `oneOf` / `allOf`, `$ref` / `$defs` (including recursive schemas),
+  min/max, `multipleOf`, string formats (date-time, email, uuid, uri…), nullable types,
+  `prefixItems` and more. Property names flavor the values (`city` → `"Meowtown"`,
+  `name` → `"Whiskers"`).
+* In the Responses API, if the `image_generation` tool is available and you ask it to draw
+  something, the cat draws.
 
-**Structured outputs.** `json_schema` formats produce JSON matching the schema; `json_object`
+**Structured outputs.** `json_schema` formats produce JSON that matches the schema; `json_object`
 produces a small random object.
 
 **Images.** Generated images are real PNGs of randomized cat faces at exactly the requested size.
-`url` responses point back at the server (`/v1/images/files/...`) and are stateless: the URL encodes
-the seed, so it never expires and always returns the same picture.
+`url` responses point back at the server (`/v1/images/files/…`). The URL encodes the seed, so it
+never expires and always returns the same picture.
 
-**Vision input.** Images are never fetched or looked at, but data-URL images are validated (must be a
-real PNG/JPEG/GIF/WebP/BMP), and their dimensions feed OpenAI's tile formula for `prompt_tokens`
-(85 for `detail: low`, `85 + 170 × tiles` otherwise).
+**Vision input.** Images are never fetched or looked at, but data-URL images are validated (they
+must be real PNG / JPEG / GIF / WebP / BMP), and their dimensions feed OpenAI's tile formula for
+`prompt_tokens` (85 for `detail: "low"`, otherwise `85 + 170 × tiles`).
 
-**Usage accounting.** Token counts come from a simple word/punctuation tokenizer (not tiktoken) but are
-self-consistent: streamed deltas add up to the content, `max_tokens` truncates exactly, and usage
-matches what was produced. Reasoning efforts add `reasoning_tokens`, which count against
-`max_completion_tokens`, so you can test the "the model thought so long the answer is empty
-(`finish_reason="length"`)" case.
+**Token accounting.** Counts come from a simple word-and-punctuation tokenizer (not tiktoken) but
+are self-consistent: streamed deltas add up to the content, and usage matches what was produced.
+`max_tokens` is a hard cap that tool calls and reasoning count against. A request that runs out
+ends with `finish_reason: "length"` (`status: "incomplete"` in the Responses API), so you can test
+the "it thought so long there's no answer" case. A small cap is reached the way a real model would
+reach it.
 
 **Validation.** Requests are validated like the real API, with OpenAI-shaped errors
-(`{"error": {"message", "type", "param", "code"}}`) that the SDK raises as `BadRequestError` etc. This includes:
+(`{"error": {"message", "type", "param", "code"}}`) that the SDKs raise as `BadRequestError` and
+so on. This covers:
 
-* parameter ranges and types (`temperature`, `n`, `top_logprobs` without `logprobs`, `stream_options` without `stream`, ≤4 stop sequences...)
+* parameter ranges and types (`temperature`, `n`, `top_logprobs` without `logprobs`,
+  `stream_options` without `stream`, at most 4 stop sequences…)
 * message structure: roles, content parts, image data
-* tool-call bookkeeping: a `tool` message must answer a preceding `tool_calls` id, and every tool call must be answered before the next turn; in Responses, `function_call_output` must match a known `call_id`
-* tool definitions: function-name pattern, object-typed parameters, duplicate names, `tool_choice` naming a tool that doesn't exist
-* `previous_response_id` that doesn't exist, malformed JSON (including `NaN`)
+* tool-call bookkeeping: a `tool` message must answer an earlier `tool_calls` id, and every tool
+  call must be answered before the next turn; in Responses, `function_call_output` must match a
+  known `call_id`
+* tool definitions: the function-name pattern, object-typed parameters, duplicate names, and a
+  `tool_choice` that names a missing tool
+* unknown `previous_response_id`s and malformed JSON (including `NaN`)
 
 ## Testing knobs
 
-### Determinism
+**Determinism.** Pass `seed` in a request and the same body gives the same output; streaming and
+non-streaming produce identical content. Start the server with `--seed N` to make every response
+a deterministic function of its request.
 
-* Pass `seed` in a request: the same request body + seed → the same output. Streaming and
-  non-streaming produce identical content for the same seed (`stream` is excluded from the hash).
-* Start the server with `--seed N` to make **every** response a deterministic function of its request.
+**Per-request headers.** These override the server settings for a single request, so one shared
+server can play many scenarios:
 
-### Latency simulation
+| Header | Effect |
+|---|---|
+| `x-dummyllm-ttft-ms: 300` | wait 300 ms before the first token |
+| `x-dummyllm-tokens-per-second: 50` | stream at 50 tokens/s (non-streaming requests wait the equivalent time) |
+| `x-dummyllm-reply-tokens: 200` | replies of about 200 tokens (0.8–1.2×, up to 4000) that still end with `"stop"` |
+| `x-dummyllm-tool-probability: 1` | always call a tool under `tool_choice="auto"` (`0` never calls one) |
+| `x-dummyllm-error: 429` | fail with that status (any 4xx / 5xx) and an OpenAI-shaped error; 429 and 503 include `retry-after` |
 
-```bash
-dummyllm --ttft-ms 300 --tps 50   # 300 ms to first token, then 50 tokens/s
+**Server-wide.** `--ttft-ms` and `--tps` set default latency, `--error-rate 0.1` fails 10% of
+requests at random with 429 / 500 / 503, and `--api-key sk-secret` requires
+`Authorization: Bearer sk-secret` (or Azure-style `api-key`). Without `--api-key`, any key is
+accepted.
+
+## Using it in your own tests
+
+```python
+import openai
+import pytest
+from dummyllm.testing import DummyLLMServer
+
+@pytest.fixture(scope="session")
+def llm():
+    # Runs on a free port in a background thread.
+    with DummyLLMServer(seed=42, tool_call_probability=1.0) as server:
+        yield openai.OpenAI(base_url=server.base_url, api_key="test")
+
+def test_my_agent(llm):
+    ...
 ```
 
-Streaming responses are paced token by token; non-streaming responses sleep for the equivalent total.
-
-The same knobs can be set per request with headers, overriding the server settings for just that
-request: `x-dummyllm-ttft-ms: 300` and `x-dummyllm-tokens-per-second: 50`.
-
-### Reply length
-
-Natural replies are 4–48 tokens (`--min-reply-tokens` / `--max-reply-tokens`). Header
-`x-dummyllm-reply-tokens: 200` asks for about 200 tokens for that request (0.8–1.2× the value,
-1–4000) that still end naturally with `finish_reason: "stop"`. A smaller `max_tokens` still
-truncates with `"length"`.
-
-### Fault injection
-
-* Header `x-dummyllm-error: 429` (or any 4xx/5xx) makes that request fail with an OpenAI-shaped
-  error. 429/503 include `retry-after`, so SDK retry logic can be exercised.
-* `--error-rate 0.1` fails 10% of requests at random with 429/500/503.
-
-### Per-request tool probability
-
-Header `x-dummyllm-tool-probability: 1` forces a tool call under `tool_choice="auto"`, and `0` prevents one.
-
-### Auth
-
-`--api-key sk-secret` requires `Authorization: Bearer sk-secret` (or Azure-style `api-key`).
-Without it, any key is accepted.
+`DummyLLMServer` takes any configuration option as a keyword argument. To mount or serve the ASGI
+app yourself, use `dummyllm.create_app(Config(...))`.
 
 ## Configuration
 
 Every option is a CLI flag and a `DUMMYLLM_*` environment variable:
 
-| Flag | Env | Default |
+| Flag | Environment variable | Default |
 |---|---|---|
 | `--host` | `DUMMYLLM_HOST` | `127.0.0.1` |
 | `--port` | `DUMMYLLM_PORT` | `8000` |
@@ -193,79 +206,71 @@ Every option is a CLI flag and a `DUMMYLLM_*` environment variable:
 | `--ttft-ms` | `DUMMYLLM_TIME_TO_FIRST_TOKEN_MS` | `0` |
 | `--tps` | `DUMMYLLM_TOKENS_PER_SECOND` | `0` (instant) |
 | `--error-rate` | `DUMMYLLM_ERROR_RATE` | `0` |
+| `--response-store` | `DUMMYLLM_RESPONSE_STORE` | `memory` (or `modal-dict:<name>`, see below) |
 | `--response-store-size` | `DUMMYLLM_RESPONSE_STORE_SIZE` | `1000` |
-| `--public-url` | `DUMMYLLM_PUBLIC_URL` | request host (used in image URLs) |
+| `--public-url` | `DUMMYLLM_PUBLIC_URL` | the request's host (used in image URLs) |
 | `--log-level` | `DUMMYLLM_LOG_LEVEL` | `info` |
 
 ## Deploying to Modal
 
-[`modal_app.py`](modal_app.py) serves dummyllm on Modal at **<https://dummyllm.com>** (the playground is
-at the root; the API at `/v1`):
+[`modal_app.py`](modal_app.py) is how <https://dummyllm.com> is hosted. To deploy your own copy:
 
 ```bash
-MODAL_PROFILE=modal-garden uvx modal deploy modal_app.py -e xiaohua-dev   # or `modal serve` for a hot-reloading dev run
+uvx modal deploy modal_app.py   # or `uvx modal serve` for a hot-reloading dev run
 ```
 
-Notes:
-
-* **Custom domain.** `dummyllm.com` is registered in the `modal-garden` workspace and attached with
-  `@modal.asgi_app(custom_domains=[...])`. (`app.server` doesn't take custom domains, so the app is
-  an ASGI web function.)
-* **No auth.** The endpoint is public: any OpenAI client works with just `base_url`, and the
-  playground opens in a browser. Set `DUMMYLLM_API_KEY` to require a key.
-* **Concurrency.** Each container serves up to 500 requests at once (`@modal.concurrent`), and
-  Modal adds containers (up to 10) past ~100 in flight per container. The Responses store
-  (`previous_response_id`, `GET /v1/responses/{id}`) lives in a shared `modal.Dict`
-  (`--response-store modal-dict:<name>`), so every container sees every stored response. Locally
-  the default `--response-store memory` keeps them in process.
-* **Image URLs.** `DUMMYLLM_PUBLIC_URL` is set to the domain, so `response_format="url"` links point
-  at `https://dummyllm.com`.
-
-## Using it in your own tests
-
-```python
-import openai, pytest
-from dummyllm.testing import DummyLLMServer
-
-@pytest.fixture(scope="session")
-def llm():
-    with DummyLLMServer(seed=42, tool_call_probability=1.0) as server:   # free port, background thread
-        yield openai.OpenAI(base_url=server.base_url, api_key="test")
-
-def test_my_agent(llm):
-    ...
-```
-
-`dummyllm.create_app(Config(...))` returns the ASGI app if you'd rather mount or serve it yourself.
+* **Domain.** Set `DOMAIN` in `modal_app.py` to a domain registered in your Modal workspace, or
+  drop `custom_domains` to use the default `*.modal.run` URL. Set `DUMMYLLM_PUBLIC_URL` to match,
+  so image URLs point at it.
+* **Scaling.** Each container serves up to 500 requests at once, and Modal adds containers (up to
+  10) once more than ~100 are in flight per container. Stored responses live in a shared
+  `modal.Dict` (`DUMMYLLM_RESPONSE_STORE=modal-dict:<name>`), so `previous_response_id` works
+  whichever container picks up the request.
+* **Auth.** The endpoint is public. Set `DUMMYLLM_API_KEY` (for example from a `modal.Secret`) to
+  require a key.
 
 ## Development
 
 ```bash
+git clone https://github.com/zxh3/dummyllm && cd dummyllm
 uv sync
 uv run pytest
+uv run dummyllm
 ```
 
-The test suite drives the server through the official `openai` Python SDK (sync and async),
-validates every generated tool argument and structured output with `jsonschema`, and checks
-streaming/non-streaming equivalence, the Responses event protocol, error shapes and pathological
-inputs. dummyllm has also been checked against the OpenAI Agents SDK and LangChain's `ChatOpenAI`.
+The tests drive the server through the official `openai` Python SDK (sync and async), validate
+every generated tool argument and structured output with `jsonschema`, and check
+streaming / non-streaming equivalence, the Responses event protocol, error shapes and pathological
+inputs. dummyllm has also been tried with the OpenAI Agents SDK and LangChain's `ChatOpenAI`.
+
+The playground source lives in [`web/`](web/) (React, Tailwind CSS, shadcn/ui, Vite). Its
+production build is committed to `src/dummyllm/static/playground/`, so the Python package serves
+it without Node. To work on it:
+
+```bash
+uv run dummyllm                 # API on :8000
+cd web && npm install
+npm run dev                     # Vite on :5173, proxying /v1 to :8000 (override with DUMMYLLM_URL)
+npm run build                   # rebuild the bundle that ships in the Python package
+```
 
 Layout:
 
-```
+```text
 src/dummyllm/
-  app.py            ASGI app + routing
-  common.py         auth, fault injection, latency, SSE, error envelope
-  engine.py         request validation + "inference": tool decisions, text/JSON generation
-  meow.py           the cat language model
-  schema_faker.py   random values that conform to a JSON Schema
-  images.py         pure-Python PNG cat renderer + image header parsing
-  tokens.py         stand-in tokenizer + vision token formula
-  routes/           chat, completions, responses, embeddings, images, models
-  testing.py        DummyLLMServer for use in other test suites
-  static/playground the built chat UI (generated by `npm run build` in web/)
-web/                chat UI source: React + Tailwind CSS + shadcn/ui (Vite)
-modal_app.py        Modal deployment (ASGI web function at dummyllm.com)
+  app.py              ASGI app and routing
+  common.py           auth, per-request overrides, fault injection, latency, SSE, errors
+  engine.py           request validation and "inference": tool decisions, text/JSON generation
+  meow.py             the cat language model
+  schema_faker.py     random values that conform to a JSON Schema
+  images.py           pure-Python PNG cat renderer and image header parsing
+  tokens.py           stand-in tokenizer and vision token formula
+  store.py            Responses API storage (in memory or a modal.Dict)
+  routes/             chat, completions, responses, embeddings, images, models
+  testing.py          DummyLLMServer for other test suites
+  static/playground/  the built playground (from `npm run build` in web/)
+web/                  playground source
+modal_app.py          the Modal deployment behind dummyllm.com
 ```
 
 ## License
