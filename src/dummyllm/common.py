@@ -36,8 +36,17 @@ _LATENCY_HEADERS = {
 }
 
 
+MAX_REPLY_TOKENS_HEADER = 4000
+
+
 def cfg_of(request: Request) -> Config:
-    """The server config, with any per-request ``x-dummyllm-*`` latency overrides applied."""
+    """The server config, with any per-request ``x-dummyllm-*`` overrides applied.
+
+    Latency: ``x-dummyllm-ttft-ms``, ``x-dummyllm-tokens-per-second``.
+    Length: ``x-dummyllm-reply-tokens: N`` makes natural replies about N tokens
+    (0.8N-1.2N, ending with "stop") and lets ``max_tokens`` caps up to that size
+    be hit exactly.
+    """
     cached = getattr(request.state, "dummyllm_config", None)
     if cached is not None:
         return cached
@@ -47,6 +56,11 @@ def cfg_of(request: Request) -> Config:
         value = header_float(request, header, 0.0, hi)
         if value is not None:
             changes[fieldname] = value
+    reply = header_float(request, "x-dummyllm-reply-tokens", 1.0, MAX_REPLY_TOKENS_HEADER)
+    if reply is not None:
+        lo = max(1, round(reply * 0.8))
+        changes["min_reply_tokens"] = lo
+        changes["max_reply_tokens"] = max(lo, round(reply * 1.2))
     if changes:
         cfg = dataclasses.replace(cfg, **changes)
     request.state.dummyllm_config = cfg

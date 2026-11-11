@@ -50,6 +50,7 @@ Tailwind CSS and shadcn/ui. It has:
 * tool calling, with demo tools that "run" in the browser and feed results back to the model
 * image uploads (vision input) and image generation
 * a reasoning-effort setting, JSON mode, system instructions, seed and max tokens
+* a **Reply length** slider (sends `x-dummyllm-reply-tokens`; *auto* keeps the server's natural length)
 * a **View code** dialog that turns the current conversation into Python, Node.js or curl
 
 The playground asks the server to simulate a realistic typing speed via per-request headers
@@ -152,6 +153,13 @@ Streaming responses are paced token by token; non-streaming responses sleep for 
 
 The same knobs can be set per request with headers, overriding the server settings for just that
 request: `x-dummyllm-ttft-ms: 300` and `x-dummyllm-tokens-per-second: 50`.
+
+### Reply length
+
+Natural replies are 4–48 tokens (`--min-reply-tokens` / `--max-reply-tokens`). Header
+`x-dummyllm-reply-tokens: 200` asks for about 200 tokens for that request (0.8–1.2× the value,
+1–4000) that still end naturally with `finish_reason: "stop"`. A smaller `max_tokens` still
+truncates with `"length"`.
 
 ### Fault injection
 

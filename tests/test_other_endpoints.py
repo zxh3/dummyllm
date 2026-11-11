@@ -293,3 +293,19 @@ def test_image_url_honors_forwarded_host(http):
         headers={"x-forwarded-host": "llm.example.com", "x-forwarded-proto": "https"},
     )
     assert r.json()["data"][0]["url"].startswith("https://llm.example.com/v1/images/files/img_")
+
+
+def test_reply_tokens_header(http):
+    body = {"model": "kiana", "messages": [{"role": "user", "content": "hi"}]}
+    for seed in range(5):
+        r = http.post("/v1/chat/completions", json={**body, "seed": seed}, headers={"x-dummyllm-reply-tokens": "200"}).json()
+        n = r["usage"]["completion_tokens"]
+        assert 160 <= n <= 260 and r["choices"][0]["finish_reason"] == "stop"
+    # Caps up to the requested length are now hit exactly.
+    r = http.post("/v1/chat/completions", json={**body, "max_tokens": 150}, headers={"x-dummyllm-reply-tokens": "200"}).json()
+    assert r["usage"]["completion_tokens"] == 150 and r["choices"][0]["finish_reason"] == "length"
+    # Short replies too.
+    r = http.post("/v1/chat/completions", json=body, headers={"x-dummyllm-reply-tokens": "5"}).json()
+    assert r["usage"]["completion_tokens"] <= 12
+    assert http.post("/v1/chat/completions", json=body, headers={"x-dummyllm-reply-tokens": "0"}).status_code == 400
+    assert http.post("/v1/chat/completions", json=body, headers={"x-dummyllm-reply-tokens": "lots"}).status_code == 400

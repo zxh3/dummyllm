@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS: Settings = {
   image: false,
   ttft: 200,
   tps: 150,
+  replyTokens: 0,
   apiKey: "",
 }
 
@@ -231,6 +232,7 @@ export const useChat = create<State>()((set, get) => {
           // Ask the server for a believable typing speed (API clients are unaffected).
           "x-dummyllm-ttft-ms": String(round ? Math.min(settings.ttft, 300) : settings.ttft),
           "x-dummyllm-tokens-per-second": String(settings.tps),
+          ...(settings.replyTokens > 0 ? { "x-dummyllm-reply-tokens": String(settings.replyTokens) } : {}),
         }),
       })
       if (!resp.ok) throw await toApiError(resp)

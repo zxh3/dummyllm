@@ -79,6 +79,8 @@ export type Settings = {
   image: boolean
   ttft: number
   tps: number
+  /** Target reply length in tokens (0 = natural, ~4-48). */
+  replyTokens: number
   apiKey: string
 }
 

@@ -39,6 +39,15 @@ export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
           <Separator />
 
           <SliderField label="Temperature" value={settings.temperature} display={settings.temperature.toFixed(2)} min={0} max={2} step={0.05} onChange={set("temperature")} />
+          <SliderField
+            label="Reply length"
+            value={settings.replyTokens}
+            display={settings.replyTokens ? `~${settings.replyTokens} tokens` : "auto"}
+            min={0}
+            max={600}
+            step={10}
+            onChange={set("replyTokens")}
+          />
           <div className="grid grid-cols-2 gap-3">
             <Field label="Max tokens">
               <Input type="number" min={1} value={settings.maxTokens} onChange={(e) => setSettings({ maxTokens: e.target.value })} placeholder="Auto" />
