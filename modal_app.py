@@ -4,11 +4,10 @@
     uvx modal deploy modal_app.py    # persistent deployment
 
 Both use the active Modal profile's workspace and environment; pass ``-e <env>``
-(and ``--profile`` / ``MODAL_PROFILE``) to target another one. Ours lives in the
-``modal-garden`` workspace (which owns the dummyllm.com domain), ``xiaohua-dev``
-environment:
+(and ``--profile`` / ``MODAL_PROFILE``) to target another one.
 
-    MODAL_PROFILE=modal-garden uvx modal deploy modal_app.py -e xiaohua-dev
+``DOMAIN`` must be registered in the workspace you deploy to. To use the default
+``*.modal.run`` URL instead, drop ``custom_domains`` and ``DUMMYLLM_PUBLIC_URL``.
 
 It's an ASGI web function rather than an ``app.server`` because only web
 functions accept ``custom_domains``. The endpoint is public: any OpenAI client
